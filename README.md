@@ -35,3 +35,9 @@ Filter ini akan:
 
 #### 28 Oktober 2025
 - Diskusi dan pemilihan ide topik Tugas Besar yang akan dikerjakan
+
+## Week - 2
+
+#### 7 November 2025
+- Membuat dataset audio soal matematika
+- Membuat dataset gambar soal matematika
