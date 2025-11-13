@@ -1,20 +1,19 @@
 import cv2
 import numpy as np
-from typing import List, Tuple, Optional
+from typing import Tuple, Optional
 
 
 class AirDrawer:
     """
     Class untuk menggambar di canvas virtual menggunakan fingertip tracking.
-    
     Attributes:
         canvas: Numpy array untuk menyimpan drawing
-        drawing_points: List of points yang digambar
-        is_drawing: Flag untuk status drawing
+        drawing_points: List of points yang digambar saat ini
+        all_strokes: History semua strokes yang sudah digambar
+        is_drawing: Flag status drawing (on/off)
         brush_color: Warna brush (BGR format)
-        brush_thickness: Ketebalan brush
+        brush_thickness: Ketebalan brush (pixels)
     """
-    
     def __init__(self, canvas_size: Tuple[int, int] = (720, 1280), 
                  brush_color: Tuple[int, int, int] = (0, 0, 255),
                  brush_thickness: int = 8):
@@ -30,7 +29,7 @@ class AirDrawer:
         self.canvas = np.zeros((self.height, self.width, 3), dtype=np.uint8)
         
         self.drawing_points = []
-        self.all_strokes = []  # List of lists untuk menyimpan semua stroke
+        self.all_strokes = []
         self.is_drawing = False
         
         self.brush_color = brush_color
@@ -51,14 +50,19 @@ class AirDrawer:
     
     def add_point(self, point: Tuple[int, int]) -> None:
         """
-        Tambahkan point ke current stroke.
+        Tambahkan point ke current stroke dan gambar garis dari point sebelumnya.
         
         Args:
-            point: (x, y) koordinat point
+            point: (x, y) koordinat point saat ini
         """
         if self.is_drawing:
             self.drawing_points.append(point)
-            self._draw_line_segment(point)
+            
+            # Draw line from previous point (inline from _draw_line_segment)
+            if len(self.drawing_points) >= 2:
+                prev_point = self.drawing_points[-2]
+                cv2.line(self.canvas, prev_point, point, 
+                        self.brush_color, self.brush_thickness, cv2.LINE_AA)
     
     def end_drawing(self) -> None:
         """
@@ -67,42 +71,6 @@ class AirDrawer:
         if self.is_drawing and len(self.drawing_points) > 0:
             self.all_strokes.append(self.drawing_points.copy())
             self.is_drawing = False
-    
-    def _draw_line_segment(self, current_point: Tuple[int, int]) -> None:
-        """
-        Gambar garis dari point sebelumnya ke point saat ini.
-        
-        Args:
-            current_point: (x, y) koordinat point saat ini
-        """
-        if len(self.drawing_points) < 2:
-            return
-        
-        prev_point = self.drawing_points[-2]
-        
-        cv2.line(self.canvas, prev_point, current_point, 
-                self.brush_color, self.brush_thickness, cv2.LINE_AA)
-    
-    def draw_all_strokes(self) -> None:
-        """
-        Redraw semua strokes yang tersimpan ke canvas.
-        Digunakan untuk refresh canvas.
-        """
-        self.canvas = np.zeros((self.height, self.width, 3), dtype=np.uint8)
-        
-        for stroke in self.all_strokes:
-            for i in range(1, len(stroke)):
-                cv2.line(self.canvas, stroke[i-1], stroke[i], 
-                        self.brush_color, self.brush_thickness, cv2.LINE_AA)
-    
-    def get_canvas(self) -> np.ndarray:
-        """
-        Dapatkan canvas saat ini.
-        
-        Returns:
-            Canvas sebagai numpy array
-        """
-        return self.canvas
     
     def clear_canvas(self) -> None:
         """
@@ -114,17 +82,38 @@ class AirDrawer:
         self.is_drawing = False
         print("[AirDrawer] Canvas cleared")
     
-    def get_digit_roi(self) -> Optional[np.ndarray]:
+    def has_drawing(self) -> bool:
         """
-        Extract region of interest (ROI) yang berisi digit untuk recognition.
+        Check apakah ada drawing di canvas.
         
         Returns:
-            ROI sebagai grayscale image atau None jika tidak ada drawing
+            True jika ada drawing, False jika kosong
         """
+        return len(self.all_strokes) > 0
+    
+    def get_preprocessed_digit(self, target_size: Tuple[int, int] = (28, 28)) -> Optional[np.ndarray]:
+        """
+        Dapatkan digit yang sudah dipreprocess untuk MNIST model (28x28 grayscale normalized).
+
+        Method ini menggabungkan ROI extraction + preprocessing dalam satu langkah:
+        1. Extract ROI (bounding box + crop)
+        2. Resize dengan aspect ratio preserved
+        3. Center pada square canvas
+        4. Normalize ke range 0-1
+        
+        Args:
+            target_size: (height, width) target size (default: 28x28 untuk MNIST)
+            
+        Returns:
+            Preprocessed image (28x28 grayscale normalized) atau None jika tidak ada drawing
+        """
+        # Check if there's any drawing
         if len(self.all_strokes) == 0:
             return None
         
-        # Flatten all points
+        # === STEP 1: ROI EXTRACTION (merged from get_digit_roi) ===
+        
+        # Flatten all points from all strokes
         all_points = []
         for stroke in self.all_strokes:
             all_points.extend(stroke)
@@ -139,14 +128,14 @@ class AirDrawer:
         min_x, max_x = min(x_coords), max(x_coords)
         min_y, max_y = min(y_coords), max(y_coords)
         
-        # Add padding
+        # Add padding (20 pixels around drawing)
         padding = 20
         min_x = max(0, min_x - padding)
         min_y = max(0, min_y - padding)
         max_x = min(self.width, max_x + padding)
         max_y = min(self.height, max_y + padding)
         
-        # Crop ROI
+        # Crop ROI from canvas
         roi = self.canvas[min_y:max_y, min_x:max_x]
         
         if roi.size == 0:
@@ -155,25 +144,8 @@ class AirDrawer:
         # Convert to grayscale
         roi_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         
-        return roi_gray
-    
-    def get_preprocessed_digit(self, target_size: Tuple[int, int] = (28, 28)) -> Optional[np.ndarray]:
-        """
-        Dapatkan digit yang sudah dipreprocess untuk MNIST model.
-        
-        Args:
-            target_size: (height, width) target size (default: 28x28 untuk MNIST)
-            
-        Returns:
-            Preprocessed image sebagai numpy array atau None
-        """
-        roi = self.get_digit_roi()
-        
-        if roi is None:
-            return None
-        
         # Resize dengan aspect ratio preserved
-        h, w = roi.shape
+        h, w = roi_gray.shape
         
         if h > w:
             new_h = target_size[0]
@@ -182,18 +154,18 @@ class AirDrawer:
             new_w = target_size[1]
             new_h = int(h * (new_w / w))
         
-        resized = cv2.resize(roi, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        resized = cv2.resize(roi_gray, (new_w, new_h), interpolation=cv2.INTER_AREA)
         
-        # Create square canvas with padding
+        # Create square canvas (28x28) with black background
         result = np.zeros(target_size, dtype=np.uint8)
         
-        # Center the digit
+        # Center the digit on canvas
         y_offset = (target_size[0] - new_h) // 2
         x_offset = (target_size[1] - new_w) // 2
         
         result[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized
         
-        # Normalize to 0-1 range
+        # Normalize to 0-1 range (MNIST requirement)
         result = result.astype(np.float32) / 255.0
         
         return result
@@ -204,18 +176,18 @@ class AirDrawer:
         
         Args:
             frame: Frame dari webcam
-            alpha: Transparansi canvas (0.0 - 1.0)
+            alpha: Transparansi canvas (0.0 = invisible, 1.0 = opaque)
             
         Returns:
             Frame dengan canvas overlay
         """
-        # Ensure same size
+        # Ensure canvas matches frame size
         if frame.shape[:2] != (self.height, self.width):
             canvas_resized = cv2.resize(self.canvas, (frame.shape[1], frame.shape[0]))
         else:
             canvas_resized = self.canvas.copy()
         
-        # Create mask for non-black pixels in canvas
+        # Create mask for non-black pixels in canvas (where there's drawing)
         gray_canvas = cv2.cvtColor(canvas_resized, cv2.COLOR_BGR2GRAY)
         _, mask = cv2.threshold(gray_canvas, 1, 255, cv2.THRESH_BINARY)
         mask_inv = cv2.bitwise_not(mask)
@@ -231,7 +203,7 @@ class AirDrawer:
             # Convert mask to 3 channels for blending
             mask_3ch = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR) / 255.0
             
-            # Blend only where there's drawing
+            # Alpha blend only where there's drawing
             blended = frame.copy()
             drawing_area = mask_3ch > 0
             blended[drawing_area] = (
@@ -242,26 +214,17 @@ class AirDrawer:
             return blended
         else:
             return frame
-    
-    def has_drawing(self) -> bool:
-        """
-        Check apakah ada drawing di canvas.
-        
-        Returns:
-            True jika ada drawing, False jika kosong
-        """
-        return len(self.all_strokes) > 0
 
 
 def main():
     print("Instructions:")
-    print("- Hold SPACE and move mouse to draw")
+    print("- Hold LEFT MOUSE button and move to draw")
     print("- Press 'c' to clear canvas")
-    print("- Press 's' to show preprocessed digit")
+    print("- Press 's' to show preprocessed digit (28x28)")
     print("- Press 'q' to quit")
     print()
     
-    # Initialize
+    # Initialize webcam
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
@@ -297,8 +260,8 @@ def main():
             drawing = False
             drawer.end_drawing()
     
-    cv2.namedWindow("Air Drawer Demo")
-    cv2.setMouseCallback("Air Drawer Demo", mouse_callback)
+    cv2.namedWindow("Air Drawer Demo - Cleaned")
+    cv2.setMouseCallback("Air Drawer Demo - Cleaned", mouse_callback)
     
     print("[INFO] Starting demo...")
     
@@ -314,12 +277,15 @@ def main():
             result = drawer.overlay_on_frame(frame, alpha=0.8)
             
             # Show instructions
-            cv2.putText(result, "Draw with LEFT MOUSE button", (10, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-            cv2.putText(result, "Press 'c' to clear, 's' to show digit, 'q' to quit", (10, 60),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            cv2.putText(result, "Draw with LEFT MOUSE | 'c' clear | 's' show digit | 'q' quit", 
+                       (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
             
-            cv2.imshow("Air Drawer Demo", result)
+            # Show status
+            if drawer.has_drawing():
+                cv2.putText(result, "Drawing exists", (10, h - 20),
+                          cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+            
+            cv2.imshow("Air Drawer Demo - Cleaned", result)
             
             key = cv2.waitKey(1) & 0xFF
             
@@ -331,9 +297,11 @@ def main():
                 digit = drawer.get_preprocessed_digit()
                 if digit is not None:
                     # Show preprocessed digit
-                    digit_display = cv2.resize(digit, (280, 280), interpolation=cv2.INTER_NEAREST)
+                    digit_display = cv2.resize(digit, (280, 280), 
+                                              interpolation=cv2.INTER_NEAREST)
                     cv2.imshow("Preprocessed Digit (28x28)", digit_display)
-                    print("[INFO] Preprocessed digit shape:", digit.shape)
+                    print(f"[INFO] Digit shape: {digit.shape}, dtype: {digit.dtype}, "
+                          f"range: [{digit.min():.2f}, {digit.max():.2f}]")
                 else:
                     print("[WARNING] No drawing to process")
     
