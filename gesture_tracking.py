@@ -1,9 +1,15 @@
 import numpy as np
 import cv2
 from cvzone.HandTrackingModule import HandDetector
+from digit_recognition import predict
 
 # --- Konstanta ---
-DRAW_CHARGE_TIME = 30  # Frame untuk aktivasi drawing
+DRAW_CHARGE_TIME = 20  # Frame untuk aktivasi drawing
+
+# Drawing box (centered square for better prediction)
+BOX_SIZE = 400  # 400x400 pixel box
+BOX_X = (1280 - BOX_SIZE) // 2  # Centered horizontally
+BOX_Y = (720 - BOX_SIZE) // 2   # Centered vertically
 NOTIFICATION_DURATION = 30  # Durasi notifikasi (frame)
 
 # Inisialisasi webcam
@@ -23,6 +29,8 @@ canvas = None
 draw_charge_counter = 0
 is_drawing_allowed = False
 notification_text = ""
+last_prediction = None
+prediction_confidence = 0.0
 notification_timer = 0
 
 def getHandInfo(img):
@@ -67,13 +75,20 @@ def draw(info, previousPosition, canvas, img):
             if previousPosition is None:
                 previousPosition = currentPosition
             
-            # Gambar garis dari posisi sebelumnya ke posisi sekarang
-            cv2.line(canvas, currentPosition, previousPosition, (255, 255, 255), 14)
-            
-            # Gambar lingkaran kecil di posisi saat ini
-            cv2.circle(canvas, currentPosition, 5, (255, 255, 255), cv2.FILLED)
-            
-            previousPosition = currentPosition
+            # Check if position is within drawing box
+            if (BOX_X <= currentPosition[0] <= BOX_X + BOX_SIZE and 
+                BOX_Y <= currentPosition[1] <= BOX_Y + BOX_SIZE):
+                
+                # Gambar garis dari posisi sebelumnya ke posisi sekarang
+                cv2.line(canvas, currentPosition, previousPosition, (255, 255, 255), 14)
+                
+                # Gambar lingkaran kecil di posisi saat ini
+                cv2.circle(canvas, currentPosition, 5, (255, 255, 255), cv2.FILLED)
+                
+                previousPosition = currentPosition
+            else:
+                # Outside box - just update position without drawing
+                previousPosition = currentPosition
     
     # Mode hapus: semua jari terangkat
     elif fingers == [1, 1, 1, 1, 1]:
@@ -81,6 +96,8 @@ def draw(info, previousPosition, canvas, img):
             canvas = np.zeros_like(img)
             notification_text = "CANVAS DIHAPUS!"
             notification_timer = NOTIFICATION_DURATION
+            last_prediction = None
+            prediction_confidence = 0.0
             print("Canvas dihapus!")
         
         previousPosition = None
@@ -90,10 +107,24 @@ def draw(info, previousPosition, canvas, img):
     # Mode simpan: 4 jari tanpa jempol
     elif fingers == [0, 1, 1, 1, 1]:
         if notification_timer == 0:
-            cv2.imwrite("hasil_gambar.png", canvas)
-            notification_text = "GAMBAR TERSIMPAN!"
+            # Crop hanya area drawing box
+            cropped_canvas = canvas[BOX_Y:BOX_Y+BOX_SIZE, BOX_X:BOX_X+BOX_SIZE]
+            
+            # Simpan gambar yang sudah di-crop
+            cv2.imwrite("hasil_gambar.png", cropped_canvas)
+            
+            # Prediksi otomatis setelah menyimpan
+            try:
+                digit, probs = predict("hasil_gambar.png")
+                last_prediction = digit
+                prediction_confidence = probs[digit]
+                notification_text = f"TERSIMPAN! Prediksi: {digit} ({probs[digit]*100:.1f}%)"
+                print(f"Gambar disimpan. Prediksi: {digit} (Confidence: {probs[digit]*100:.2f}%)")
+            except Exception as e:
+                notification_text = "TERSIMPAN! (Gagal prediksi)"
+                print(f"Gambar disimpan, tapi gagal prediksi: {e}")
+            
             notification_timer = NOTIFICATION_DURATION
-            print("Gambar disimpan sebagai 'hasil_gambar.png'")
         
         previousPosition = None
         is_drawing_allowed = False
@@ -149,6 +180,51 @@ def displayLoadingBar(img, fingers):
             cv2.rectangle(img, (50, 230), (50 + bar_width, 260), 
                          (0, 255, 0), cv2.FILLED)
 
+def displayDrawingBox(img):
+    """
+    Menampilkan kotak area menggambar
+    """
+    # Gambar border kotak dengan warna cyan
+    cv2.rectangle(img, (BOX_X, BOX_Y), (BOX_X + BOX_SIZE, BOX_Y + BOX_SIZE), 
+                 (255, 255, 0), 3)  # Cyan color, 3px thick
+    
+    # Label di atas kotak
+    cv2.putText(img, "GAMBAR DI SINI", (BOX_X + 100, BOX_Y - 10), 
+               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+
+def displayPrediction(img):
+    """
+    Menampilkan hasil prediksi di layar
+    """
+    global last_prediction, prediction_confidence
+    
+    if last_prediction is not None:
+        # Background box untuk prediksi
+        box_x, box_y, box_w, box_h = 1000, 20, 260, 180
+        
+        # Buat overlay semi-transparan
+        overlay = img.copy()
+        cv2.rectangle(overlay, (box_x, box_y), (box_x + box_w, box_y + box_h), 
+                     (50, 50, 50), -1)
+        cv2.addWeighted(overlay, 0.7, img, 0.3, 0, img)
+        
+        # Border
+        cv2.rectangle(img, (box_x, box_y), (box_x + box_w, box_y + box_h), 
+                     (0, 255, 0), 3)
+        
+        # Judul
+        cv2.putText(img, "PREDIKSI:", (box_x + 20, box_y + 40), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+        
+        # Angka prediksi (besar)
+        cv2.putText(img, str(last_prediction), (box_x + 100, box_y + 120), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 255, 0), 5)
+        
+        # Confidence
+        conf_text = f"Confidence: {prediction_confidence*100:.1f}%"
+        cv2.putText(img, conf_text, (box_x + 20, box_y + 160), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
 def displayNotification(img):
     """
     Menampilkan notifikasi sementara di layar
@@ -203,6 +279,9 @@ while True:
     # Gabungkan gambar kamera dengan canvas
     combinedImage = cv2.addWeighted(img, 0.7, canvas, 0.3, 0)
     
+    # Tampilkan kotak area menggambar
+    displayDrawingBox(combinedImage)
+    
     # Tampilkan instruksi
     displayInstructions(combinedImage)
     
@@ -213,9 +292,12 @@ while True:
     # Tampilkan notifikasi
     displayNotification(combinedImage)
     
+    # Tampilkan prediksi
+    displayPrediction(combinedImage)
+    
     # Tampilkan hasil
     cv2.imshow("Gesture Drawing - Combined View", combinedImage)
-    cv2.imshow("Canvas Only", canvas)
+    # cv2.imshow("Canvas Only", canvas)
     
     # Tekan 'q' untuk keluar
     if cv2.waitKey(1) & 0xFF == ord('q'):
