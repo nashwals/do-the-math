@@ -195,7 +195,6 @@ def preprocess_single_digit(canvas, bbox):
     
     return processed_img
 
-
 def recognize_multi_digit(session, canvas, max_digits=3):
     """
     Mengenali multiple digits dari canvas untuk angka lebih dari 1 digit.

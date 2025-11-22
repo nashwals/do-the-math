@@ -36,7 +36,6 @@ is_drawing_allowed = False
 notification_text = ""
 notification_timer = 0
 
-
 def getHandInfo(img):
     """
     Mendapatkan informasi tangan dari frame.
