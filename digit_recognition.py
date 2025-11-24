@@ -1,13 +1,6 @@
 """
-Modul Digit Recognition untuk Mengenali Angka Tulisan Tangan (ONNX Version)
-============================================================================
-
-Modul ini menyediakan fungsi-fungsi untuk:
-1. Memuat model MNIST pre-trained dalam format ONNX
-2. Preprocessing canvas gambar untuk input model
-3. Prediksi digit dari gambar yang telah diproses
-
-Menggunakan ONNX Runtime untuk inference yang lebih cepat dan portable.
+Modul Digit Recognition untuk Mengenali Angka Tulisan Tangan
+Menggunakan ONNX Runtime untuk inference model MNIST
 """
 
 import cv2
@@ -21,9 +14,6 @@ def download_onnx_model():
     """
     Download pre-trained MNIST model dalam format ONNX dari repository.
     
-    Model akan didownload dari ONNX Model Zoo dan disimpan di folder models/.
-    Model ini sudah dilatih dengan dataset MNIST dan memiliki akurasi ~99%.
-    
     Returns:
         str: Path ke file model yang sudah didownload
         
@@ -33,15 +23,12 @@ def download_onnx_model():
     model_dir = "models"
     model_path = os.path.join(model_dir, "mnist-8.onnx")
     
-    # Buat folder models jika belum ada
     os.makedirs(model_dir, exist_ok=True)
     
-    # Jika model sudah ada, tidak perlu download lagi
     if os.path.exists(model_path):
-        print(f"✓ Model ONNX sudah ada di {model_path}")
+        print(f"Model ONNX sudah ada di {model_path}")
         return model_path
     
-    # URL model MNIST dari ONNX Model Zoo
     model_url = "https://github.com/onnx/models/raw/main/validated/vision/classification/mnist/model/mnist-8.onnx"
     
     try:
@@ -49,25 +36,19 @@ def download_onnx_model():
         print(f"URL: {model_url}")
         print("Ini mungkin memakan waktu beberapa detik...")
         
-        # Download model
         urllib.request.urlretrieve(model_url, model_path)
         
-        print(f"✓ Model berhasil didownload ke {model_path}")
+        print(f"Model berhasil didownload ke {model_path}")
         return model_path
     
     except Exception as e:
-        print(f"✗ Error saat mendownload model: {str(e)}")
+        print(f"Error saat mendownload model: {str(e)}")
         raise
 
 
 def load_model():
     """
     Memuat model MNIST ONNX yang sudah dilatih atau mendownload jika belum ada.
-    
-    Fungsi ini akan:
-    1. Cek apakah file model sudah ada
-    2. Jika belum ada, download dari ONNX Model Zoo
-    3. Load model menggunakan ONNX Runtime
     
     Returns:
         onnxruntime.InferenceSession: Model MNIST yang siap digunakan untuk prediksi
@@ -76,15 +57,12 @@ def load_model():
         Exception: Jika terjadi error saat loading model
     """
     try:
-        # Download model jika belum ada
         model_path = download_onnx_model()
         
-        # Load model dengan ONNX Runtime
         print("\nLoading ONNX model...")
         session = ort.InferenceSession(model_path)
         
-        # Tampilkan informasi model
-        print("✓ Model berhasil dimuat!")
+        print("Model berhasil dimuat!")
         print(f"Input name: {session.get_inputs()[0].name}")
         print(f"Input shape: {session.get_inputs()[0].shape}")
         print(f"Output name: {session.get_outputs()[0].name}")
@@ -92,75 +70,227 @@ def load_model():
         return session
     
     except Exception as e:
-        print(f"✗ Error saat loading model: {str(e)}")
+        print(f"Error saat loading model: {str(e)}")
         raise
+
+
+def find_digit_bboxes(canvas, min_area=200, max_digits=3):
+    """
+    Mencari bounding boxes untuk semua digit di canvas untuk multi-digit recognition.
+    Optimized untuk mendeteksi digit terpisah dengan lebih baik.
+    
+    Args:
+        canvas: Canvas berisi gambar digit dalam format BGR
+        min_area: Minimum area contour yang dianggap valid (dinaikkan untuk filter noise)
+        max_digits: Maximum jumlah digit yang akan dideteksi
+        
+    Returns:
+        list: List of bounding boxes (x, y, w, h) sorted dari kiri ke kanan
+    """
+    gray = cv2.cvtColor(canvas, cv2.COLOR_BGR2GRAY)
+    
+    denoised = cv2.fastNlMeansDenoising(gray, None, h=10, templateWindowSize=7, searchWindowSize=21)
+    
+    _, thresh = cv2.threshold(denoised, 30, 255, cv2.THRESH_BINARY)
+    
+    # Reduced morphological operations untuk preserve digit separation
+    kernel = np.ones((2, 2), np.uint8)
+    thresh = cv2.erode(thresh, kernel, iterations=1)
+    
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    if not contours:
+        return []
+    
+    bboxes = []
+    for contour in contours:
+        area = cv2.contourArea(contour)
+        
+        if area < min_area:
+            continue
+        
+        x, y, w, h = cv2.boundingRect(contour)
+        
+        # Stricter size constraints untuk filter noise
+        if w < 20 or h < 20:
+            continue
+        if w > canvas.shape[1] * 0.9 or h > canvas.shape[0] * 0.9:
+            continue
+        
+        # Stricter aspect ratio
+        aspect_ratio = w / h if h > 0 else 0
+        if aspect_ratio > 2.5 or aspect_ratio < 0.2:
+            continue
+        
+        hull = cv2.convexHull(contour)
+        hull_area = cv2.contourArea(hull)
+        solidity = area / hull_area if hull_area > 0 else 0
+        
+        if solidity < 0.3:
+            continue
+        
+        # Increased padding for better digit capture
+        padding = 30
+        x_padded = max(0, x - padding)
+        y_padded = max(0, y - padding)
+        w_padded = min(canvas.shape[1] - x_padded, w + 2 * padding)
+        h_padded = min(canvas.shape[0] - y_padded, h + 2 * padding)
+        
+        bboxes.append((x_padded, y_padded, w_padded, h_padded))
+    
+    if len(bboxes) > max_digits:
+        bboxes.sort(key=lambda box: box[2] * box[3], reverse=True)
+        bboxes = bboxes[:max_digits]
+    
+    bboxes.sort(key=lambda box: box[0])
+    
+    return bboxes
+
+
+def preprocess_single_digit(canvas, bbox):
+    """
+    Memproses single digit dari bounding box untuk input ke model MNIST.
+    
+    Args:
+        canvas: Canvas berisi gambar digit dalam format BGR
+        bbox: Bounding box (x, y, w, h)
+        
+    Returns:
+        numpy.ndarray: Gambar yang sudah diproses dengan shape (1, 1, 28, 28)
+    """
+    x, y, w, h = bbox
+    
+    roi = canvas[y:y+h, x:x+w]
+    gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+    
+    denoised = cv2.fastNlMeansDenoising(gray, None, h=10, templateWindowSize=7, searchWindowSize=21)
+    
+    _, thresh = cv2.threshold(denoised, 30, 255, cv2.THRESH_BINARY)
+    
+    kernel_dilate = np.ones((3, 3), np.uint8)
+    dilated = cv2.dilate(thresh, kernel_dilate, iterations=2)
+    
+    kernel_erode = np.ones((2, 2), np.uint8)
+    processed = cv2.erode(dilated, kernel_erode, iterations=1)
+    
+    target_size = 56
+    max_side = max(w, h)
+    
+    scale_factor = (target_size * 0.8) / max_side
+    new_w = int(w * scale_factor)
+    new_h = int(h * scale_factor)
+    
+    resized = cv2.resize(processed, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    
+    square_canvas = np.zeros((target_size, target_size), dtype=np.uint8)
+    x_offset = (target_size - new_w) // 2
+    y_offset = (target_size - new_h) // 2
+    square_canvas[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized
+    
+    resized_28 = cv2.resize(square_canvas, (28, 28), interpolation=cv2.INTER_AREA)
+    
+    normalized = resized_28.astype("float32") / 255.0
+    
+    processed_img = normalized.reshape(1, 1, 28, 28)
+    
+    return processed_img
+
+
+def recognize_multi_digit(session, canvas, max_digits=3):
+    """
+    Mengenali multiple digits dari canvas untuk angka lebih dari 1 digit.
+    
+    Args:
+        session: ONNX model session
+        canvas: Canvas berisi gambar digit dalam format BGR
+        max_digits: Maximum jumlah digit yang akan dideteksi
+        
+    Returns:
+        tuple: (result_string, average_confidence)
+            result_string: String angka hasil prediksi contoh "123"
+            average_confidence: Rata-rata confidence dalam persen
+            None, 0.0 jika tidak ada digit terdeteksi
+    """
+    bboxes = find_digit_bboxes(canvas, min_area=200, max_digits=max_digits)
+    
+    if not bboxes:
+        return None, 0.0
+    
+    digits = []
+    confidences = []
+    
+    input_name = session.get_inputs()[0].name
+    
+    for bbox in bboxes:
+        processed = preprocess_single_digit(canvas, bbox)
+        
+        outputs = session.run(None, {input_name: processed})
+        predictions = outputs[0][0]
+        
+        exp_pred = np.exp(predictions - np.max(predictions))
+        probabilities = exp_pred / np.sum(exp_pred)
+        
+        digit = int(np.argmax(probabilities))
+        confidence = float(np.max(probabilities)) * 100
+        
+        # Raised confidence threshold untuk avoid false positives
+        if confidence < 40:
+            continue
+        
+        digits.append(str(digit))
+        confidences.append(confidence)
+    
+    if not digits:
+        return None, 0.0
+    
+    result_string = "".join(digits)
+    avg_confidence = sum(confidences) / len(confidences)
+    
+    return result_string, avg_confidence
 
 
 def preprocess_canvas(canvas, debug_mode=False):
     """
-    Memproses canvas gambar untuk input ke model MNIST dengan teknik yang robust.
-    
-    Tahapan preprocessing (OPTIMIZED):
-    1. Konversi ke grayscale
-    2. Denoising untuk mengurangi noise
-    3. Thresholding untuk isolasi digit
-    4. Morphological operations untuk memperkuat stroke
-    5. Deteksi dan crop bounding box
-    6. Centering di square canvas dengan padding optimal
-    7. Resize ke 28x28 dengan anti-aliasing
-    8. Normalisasi sesuai format ONNX MNIST model
-    9. Reshape untuk input model ONNX
+    Memproses canvas gambar untuk input ke model MNIST.
+    Fungsi ini untuk single digit recognition.
+    Untuk multi-digit gunakan recognize_multi_digit().
     
     Args:
-        canvas (numpy.ndarray): Canvas berisi gambar digit (BGR format)
-        debug_mode (bool): Jika True, tampilkan visualisasi preprocessing steps
+        canvas: Canvas berisi gambar digit dalam format BGR
+        debug_mode: Jika True, tampilkan visualisasi preprocessing steps
         
     Returns:
-        numpy.ndarray: Gambar yang sudah diproses dengan shape (1, 1, 28, 28) untuk ONNX
+        numpy.ndarray: Gambar yang sudah diproses dengan shape (1, 1, 28, 28)
         None: Jika tidak ada gambar yang terdeteksi di canvas
-        
-    Example:
-        >>> processed_img = preprocess_canvas(canvas, debug_mode=True)
-        >>> if processed_img is not None:
-        >>>     prediction = session.run(None, {input_name: processed_img})
     """
-    # Step 1: Konversi ke grayscale
     gray = cv2.cvtColor(canvas, cv2.COLOR_BGR2GRAY)
     
-    # Step 2: Denoising - mengurangi noise pada gambar
     denoised = cv2.fastNlMeansDenoising(gray, None, h=10, templateWindowSize=7, searchWindowSize=21)
     
-    # Step 3: Threshold
     _, thresh = cv2.threshold(denoised, 30, 255, cv2.THRESH_BINARY)
     
-    # Step 4: Morphological operations untuk memperkuat stroke
     kernel_dilate = np.ones((3, 3), np.uint8)
     dilated = cv2.dilate(thresh, kernel_dilate, iterations=2)
     
     kernel_erode = np.ones((2, 2), np.uint8)
     eroded = cv2.erode(dilated, kernel_erode, iterations=1)
     
-    # Step 5: Cari contours dari area yang digambar
     contours, _ = cv2.findContours(eroded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
-    # Jika tidak ada gambar yang terdeteksi
     if len(contours) == 0:
-        print("⚠ Tidak ada gambar yang terdeteksi di canvas")
+        print("Tidak ada gambar yang terdeteksi di canvas")
         return None
     
-    # Step 6: Filter contours yang terlalu kecil (noise)
     min_contour_area = 100
     valid_contours = [cnt for cnt in contours if cv2.contourArea(cnt) > min_contour_area]
     
     if len(valid_contours) == 0:
-        print("⚠ Gambar terlalu kecil atau hanya noise")
+        print("Gambar terlalu kecil atau hanya noise")
         return None
     
-    # Gabungkan semua valid contours untuk mendapatkan bounding box
     all_contours = np.vstack(valid_contours)
     x, y, w, h = cv2.boundingRect(all_contours)
     
-    # Step 7: Tambahkan padding proporsional (20% dari dimensi)
     padding_percent = 0.2
     padding_w = int(w * padding_percent)
     padding_h = int(h * padding_percent)
@@ -170,39 +300,28 @@ def preprocess_canvas(canvas, debug_mode=False):
     w = min(canvas.shape[1] - x, w + 2 * padding_w)
     h = min(canvas.shape[0] - y, h + 2 * padding_h)
     
-    # Crop gambar sesuai bounding box
     cropped = eroded[y:y+h, x:x+w]
     
-    # Step 8: Buat square canvas dengan ukuran lebih besar untuk quality
-    target_size = 56  # 2x ukuran final untuk anti-aliasing
+    target_size = 56
     max_side = max(w, h)
     
-    # Hitung scale factor agar digit memenuhi ~80% area
     scale_factor = (target_size * 0.8) / max_side
     new_w = int(w * scale_factor)
     new_h = int(h * scale_factor)
     
-    # Resize cropped image
     resized_cropped = cv2.resize(cropped, (new_w, new_h), interpolation=cv2.INTER_AREA)
     
-    # Buat square canvas dan center gambar
     square_canvas = np.zeros((target_size, target_size), dtype=np.uint8)
     x_offset = (target_size - new_w) // 2
     y_offset = (target_size - new_h) // 2
     square_canvas[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized_cropped
     
-    # Step 9: Resize ke 28x28 dengan anti-aliasing
     resized = cv2.resize(square_canvas, (28, 28), interpolation=cv2.INTER_AREA)
     
-    # Step 10: Normalisasi untuk ONNX model
-    # ONNX MNIST model expects input range [0, 1] with float32
     normalized = resized.astype("float32") / 255.0
     
-    # Step 11: Reshape untuk ONNX model: (1, 1, 28, 28)
-    # Format: (batch_size, channels, height, width)
     processed = normalized.reshape(1, 1, 28, 28)
     
-    # Debug mode: Tampilkan visualisasi preprocessing steps
     if debug_mode:
         visualize_preprocessing(gray, denoised, thresh, dilated, eroded, 
                                cropped, square_canvas, resized)
@@ -214,41 +333,24 @@ def predict_digit(session, processed_image):
     """
     Memprediksi digit dari gambar yang telah diproses menggunakan ONNX model.
     
-    Fungsi ini menggunakan ONNX Runtime untuk inference dan
-    mengembalikan hasil prediksi beserta confidence score.
-    
     Args:
-        session (onnxruntime.InferenceSession): ONNX model session
-        processed_image (numpy.ndarray): Gambar yang sudah diproses dengan shape (1, 1, 28, 28)
+        session: ONNX model session
+        processed_image: Gambar yang sudah diproses dengan shape (1, 1, 28, 28)
         
     Returns:
         tuple: (predicted_digit, confidence)
-            - predicted_digit (int): Angka hasil prediksi (0-9)
-            - confidence (float): Tingkat keyakinan prediksi dalam persen (0-100)
-            
-    Example:
-        >>> digit, conf = predict_digit(session, processed_img)
-        >>> print(f"Prediksi: {digit} (Confidence: {conf:.2f}%)")
+            predicted_digit: Angka hasil prediksi (0-9)
+            confidence: Tingkat keyakinan prediksi dalam persen (0-100)
     """
-    # Get input name dari model
     input_name = session.get_inputs()[0].name
     
-    # Run inference
     outputs = session.run(None, {input_name: processed_image})
-    
-    # Output dari ONNX MNIST model adalah logits atau probabilities
-    # Shape: (1, 10) untuk 10 kelas digit (0-9)
     predictions = outputs[0][0]
     
-    # Apply softmax jika output adalah logits (untuk mendapatkan probabilities)
-    # Jika sudah probabilities, softmax tidak akan mengubah urutan
-    exp_predictions = np.exp(predictions - np.max(predictions))  # Subtract max for numerical stability
+    exp_predictions = np.exp(predictions - np.max(predictions))
     probabilities = exp_predictions / np.sum(exp_predictions)
     
-    # Ambil indeks dengan probabilitas tertinggi
     predicted_digit = np.argmax(probabilities)
-    
-    # Ambil nilai confidence (probabilitas tertinggi dalam persen)
     confidence = np.max(probabilities) * 100
     
     return int(predicted_digit), float(confidence)
@@ -259,85 +361,47 @@ def display_prediction_result(predicted_digit, confidence):
     Menampilkan hasil prediksi ke terminal dengan format yang rapi.
     
     Args:
-        predicted_digit (int): Angka hasil prediksi (0-9)
-        confidence (float): Tingkat keyakinan prediksi dalam persen (0-100)
+        predicted_digit: Angka hasil prediksi
+        confidence: Tingkat keyakinan prediksi dalam persen (0-100)
     """
-    print("\n" + "=" * 50)
-    print("HASIL PREDIKSI DIGIT")
-    print("=" * 50)
+    print("\nHASIL PREDIKSI DIGIT")
     print(f"Angka terdeteksi: {predicted_digit}")
     print(f"Confidence: {confidence:.2f}%")
-    print("=" * 50 + "\n")
+    print()
 
 
 def visualize_preprocessing(gray, denoised, thresh, dilated, eroded, 
                             cropped, square_canvas, resized):
     """
     Menampilkan visualisasi dari setiap step preprocessing untuk debugging.
-    
-    Fungsi ini berguna untuk:
-    - Debugging preprocessing pipeline
-    - Memahami transformasi yang terjadi pada gambar
-    - Mengidentifikasi masalah pada preprocessing
-    
-    Args:
-        gray: Gambar grayscale
-        denoised: Gambar setelah denoising
-        thresh: Gambar setelah thresholding
-        dilated: Gambar setelah dilation
-        eroded: Gambar setelah erosion
-        cropped: Gambar yang sudah di-crop
-        square_canvas: Gambar di square canvas
-        resized: Gambar yang sudah di-resize ke 28x28
     """
-    import matplotlib.pyplot as plt
-    
-    # Buat figure dengan subplot untuk setiap step
-    fig, axes = plt.subplots(2, 4, figsize=(14, 7))
-    fig.suptitle('Preprocessing Pipeline Visualization (ONNX)', fontsize=16)
-    
-    # Plot setiap step
-    steps = [
-        (gray, 'Step 1: Grayscale'),
-        (denoised, 'Step 2: Denoised'),
-        (thresh, 'Step 3: Threshold'),
-        (dilated, 'Step 4: Dilated'),
-        (eroded, 'Step 5: Eroded'),
-        (cropped, 'Step 6: Cropped'),
-        (square_canvas, 'Step 7: Square Canvas'),
-        (resized, 'Step 8: Final (28x28)')
-    ]
-    
-    for idx, (img, title) in enumerate(steps):
-        row = idx // 4
-        col = idx % 4
-        axes[row, col].imshow(img, cmap='gray')
-        axes[row, col].set_title(title)
-        axes[row, col].axis('off')
-    
-    plt.tight_layout()
-    plt.show()
-    
-    print("\n[DEBUG] Visualisasi preprocessing ditampilkan.")
-    print("[DEBUG] Tutup window visualisasi untuk melanjutkan.")
-
-
-# Test function untuk memastikan modul berjalan dengan baik
-if __name__ == "__main__":
-    print("Testing Digit Recognition Module (ONNX Version)...")
-    print("-" * 60)
-    
-    # Test loading model
     try:
-        session = load_model()
-        print("\n✓ Model loading test: PASSED")
-        print(f"✓ Model ready for inference")
-    except Exception as e:
-        print(f"\n✗ Model loading test: FAILED - {str(e)}")
-    
-    print("\nModule siap digunakan!")
-    print("\nTips untuk akurasi lebih baik:")
-    print("- Gambar angka dengan jelas dan tidak terlalu miring")
-    print("- Pastikan stroke tidak terlalu tipis atau terlalu tebal")
-    print("- Gambar di area tengah canvas")
-    print("- Gunakan debug_mode=True untuk melihat preprocessing steps")
+        import matplotlib.pyplot as plt
+        
+        fig, axes = plt.subplots(2, 4, figsize=(14, 7))
+        fig.suptitle('Preprocessing Pipeline Visualization', fontsize=16)
+        
+        steps = [
+            (gray, 'Step 1: Grayscale'),
+            (denoised, 'Step 2: Denoised'),
+            (thresh, 'Step 3: Threshold'),
+            (dilated, 'Step 4: Dilated'),
+            (eroded, 'Step 5: Eroded'),
+            (cropped, 'Step 6: Cropped'),
+            (square_canvas, 'Step 7: Square Canvas'),
+            (resized, 'Step 8: Final 28x28')
+        ]
+        
+        for idx, (img, title) in enumerate(steps):
+            row = idx // 4
+            col = idx % 4
+            axes[row, col].imshow(img, cmap='gray')
+            axes[row, col].set_title(title)
+            axes[row, col].axis('off')
+        
+        plt.tight_layout()
+        plt.show()
+        
+        print("\nVisualisasi preprocessing ditampilkan.")
+    except ImportError:
+        print("Matplotlib tidak tersedia. Skip visualisasi.")

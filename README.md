@@ -55,3 +55,9 @@ Filter ini akan:
 
 - Membuat program untuk hand gesture tracking
 - Membuat program untuk menggambar di canvas/udara
+
+## Week - 4
+
+#### 18 - 20 November 2025
+
+- Membuat program digit recognizer untuk inferensi mnist onnx  

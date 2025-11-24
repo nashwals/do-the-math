@@ -1,56 +1,36 @@
 """
-Program Gesture Drawing dengan Digit Recognition (Simplified ONNX Version)
-==========================================================================
-
-Program ini memungkinkan pengguna untuk:
-1. Menggambar di udara menggunakan gesture tangan
-2. Mengenali angka yang digambar menggunakan AI (ONNX MNIST model)
-3. Menghapus canvas
-
-Gesture yang tersedia:
-- 1 Jari (Telunjuk): Menggambar
-- 4 Jari (Tanpa Jempol): Mengirim gambar & Prediksi Digit
-- 5 Jari: Hapus Canvas
+Modul Gesture Tracking untuk DO THE MATH
+Menggunakan CVZone HandDetector dan Digit Recognizer
 """
 
 import numpy as np
 import cv2
 from cvzone.HandTrackingModule import HandDetector
+from digit_recognition import load_model, recognize_multi_digit
 
-# Import modul digit recognition (ONNX version)
-from digit_recognition import (
-    load_model, 
-    preprocess_canvas, 
-    predict_digit, 
-    display_prediction_result
-)
+# Konstanta
+DRAW_CHARGE_TIME = 30
+NOTIFICATION_DURATION = 30
+BRUSH_SIZE = 20
 
-# --- Konstanta ---
-DRAW_CHARGE_TIME = 30  # Frame untuk aktivasi drawing
-NOTIFICATION_DURATION = 30  # Durasi notifikasi (frame)
-DEBUG_MODE = False  # Set True untuk melihat visualisasi preprocessing
-
-# Inisialisasi webcam
+# Inisialisasi
 cap = cv2.VideoCapture(0)
-cap.set(3, 1280)  # Width
-cap.set(4, 720)   # Height
+cap.set(3, 1280)
+cap.set(4, 720)
 
-# Inisialisasi Hand Detector
 detector = HandDetector(staticMode=False, maxHands=1, modelComplexity=1, 
                         detectionCon=0.7, minTrackCon=0.5)
 
-# Load ONNX MNIST model untuk digit recognition
-print("\n" + "="*60)
-print("INISIALISASI PROGRAM - ONNX VERSION")
-print("="*60)
-onnx_session = load_model()
-print("="*60 + "\n")
+try:
+    session = load_model()
+    RECOGNIZER_LOADED = True
+except:
+    RECOGNIZER_LOADED = False
+    session = None
 
-# Variabel untuk menyimpan posisi sebelumnya dan canvas
+# Variabel state
 previousPosition = None
 canvas = None
-
-# Variabel untuk fitur baru
 draw_charge_counter = 0
 is_drawing_allowed = False
 notification_text = ""
@@ -59,21 +39,17 @@ notification_timer = 0
 
 def getHandInfo(img):
     """
-    Mendeteksi tangan dan mengembalikan informasi jari dan landmark.
+    Mendapatkan informasi tangan dari frame.
     
-    Args:
-        img (numpy.ndarray): Frame gambar dari webcam
-        
     Returns:
-        tuple: (fingers, lmList) - Status jari dan list landmark
-        None: Jika tidak ada tangan yang terdeteksi
+        tuple: (fingers, lmList) atau None jika tidak ada tangan terdeteksi
     """
     hands, img = detector.findHands(img, draw=True, flipType=True)
     
     if hands:
         hand1 = hands[0]
-        lmList = hand1["lmList"]  # List of 21 landmarks
-        fingers = detector.fingersUp(hand1)  # Status jari (0=lipat, 1=tegak)
+        lmList = hand1["lmList"]
+        fingers = detector.fingersUp(hand1)
         return fingers, lmList
     else:
         return None
@@ -81,97 +57,74 @@ def getHandInfo(img):
 
 def draw(info, previousPosition, canvas, img):
     """
-    Menggambar di canvas berdasarkan gesture (SIMPLIFIED VERSION).
-    
-    Mode gesture:
-    - 1 jari (telunjuk): Menggambar (dengan loading bar)
-    - 4 jari (tanpa jempol): Submit & Prediksi digit
-    - 5 jari: Hapus canvas
+    Menangani logika drawing berdasarkan gesture tangan.
     
     Args:
-        info (tuple): Informasi fingers dan landmark dari getHandInfo()
-        previousPosition (tuple): Posisi sebelumnya untuk menggambar garis
-        canvas (numpy.ndarray): Canvas untuk menggambar
-        img (numpy.ndarray): Frame gambar dari webcam
+        info: Tuple (fingers, lmlist)
+        previousPosition: Posisi sebelumnya untuk drawing
+        canvas: Canvas untuk menggambar
+        img: Frame gambar
         
     Returns:
-        tuple: (currentPosition, canvas) - Posisi saat ini dan canvas yang diupdate
+        tuple: (currentPosition, canvas)
     """
     global draw_charge_counter, is_drawing_allowed, notification_text, notification_timer
     
     fingers, lmlist = info
     currentPosition = None
     
-    # Mode menggambar: hanya jari telunjuk yang terangkat
+    # Mode Drawing: 1 jari (telunjuk)
     if fingers == [0, 1, 0, 0, 0]:
-        currentPosition = lmlist[8][0:2]  # Posisi ujung jari telunjuk
+        currentPosition = lmlist[8][0:2]
         
-        # Logika charging untuk aktivasi drawing
         if not is_drawing_allowed:
             draw_charge_counter += 1
             if draw_charge_counter >= DRAW_CHARGE_TIME:
                 is_drawing_allowed = True
                 previousPosition = currentPosition
         
-        # Mulai menggambar setelah charging selesai
         if is_drawing_allowed:
             if previousPosition is None:
                 previousPosition = currentPosition
             
-            # Gambar garis dari posisi sebelumnya ke posisi sekarang
-            cv2.line(canvas, currentPosition, previousPosition, (255, 255, 255), 14)
-            
-            # Gambar lingkaran kecil di posisi saat ini
+            cv2.line(canvas, currentPosition, previousPosition, 
+                    (255, 255, 255), BRUSH_SIZE)
             cv2.circle(canvas, currentPosition, 5, (255, 255, 255), cv2.FILLED)
             
             previousPosition = currentPosition
     
-    # Mode prediksi digit: 4 jari tanpa jempol
+    # Mode Clear: 5 jari (tidak perlu tunggu notification timer)
+    elif fingers == [1, 1, 1, 1, 1]:
+        canvas = np.zeros_like(img)
+        if notification_timer == 0:
+            notification_text = "Hapus Canvas"
+            notification_timer = NOTIFICATION_DURATION
+        
+        previousPosition = None
+        is_drawing_allowed = False
+        draw_charge_counter = 0
+    
+    # Mode Submit dan Recognize: 4 jari (tanpa jempol)
     elif fingers == [0, 1, 1, 1, 1]:
         if notification_timer == 0:
-            print("\n" + "="*60)
-            print("MEMPROSES PREDIKSI DIGIT (ONNX)...")
-            print("="*60)
-            
-            # Preprocess canvas dengan debug mode
-            processed_image = preprocess_canvas(canvas, debug_mode=DEBUG_MODE)
-            
-            if processed_image is not None:
-                # Prediksi digit menggunakan ONNX model
-                predicted_digit, confidence = predict_digit(onnx_session, processed_image)
+            if RECOGNIZER_LOADED:
+                result, confidence = recognize_multi_digit(session, canvas, max_digits=3)
                 
-                # Tampilkan hasil di terminal
-                display_prediction_result(predicted_digit, confidence)
-                
-                # Tampilkan notifikasi di layar
-                notification_text = f"TERDETEKSI: {predicted_digit} ({confidence:.1f}%)"
-                notification_timer = NOTIFICATION_DURATION * 2  # Lebih lama untuk prediksi
+                if result is not None and confidence > 50:
+                    notification_text = f"ANGKA: {result}"
+                    cv2.imwrite("hasil_gambar.png", canvas)
+                else:
+                    notification_text = "TIDAK JELAS!"
             else:
-                print("⚠ Tidak dapat memproses gambar. Canvas kosong?")
-                notification_text = "GAMBAR TIDAK TERDETEKSI!"
-                notification_timer = NOTIFICATION_DURATION
+                notification_text = "MODEL NOT LOADED!"
             
-            # Clear canvas setelah prediksi
-            canvas = np.zeros_like(img)
-
-    # Mode hapus: semua jari terangkat
-    elif fingers == [1, 1, 1, 1, 1]:
-        if notification_timer == 0:
-            canvas = np.zeros_like(img)
-            notification_text = "CANVAS DIHAPUS!"
             notification_timer = NOTIFICATION_DURATION
-            print("\n[INFO] Canvas dihapus!")
         
         previousPosition = None
         is_drawing_allowed = False
         draw_charge_counter = 0
     
-        
-        previousPosition = None
-        is_drawing_allowed = False
-        draw_charge_counter = 0
-    
-    # Mode idle: reset semua
+    # Mode Idle
     else:
         previousPosition = None
         is_drawing_allowed = False
@@ -182,17 +135,14 @@ def draw(info, previousPosition, canvas, img):
 
 def displayInstructions(img):
     """
-    Menampilkan instruksi penggunaan di layar (SIMPLIFIED).
-    
-    Args:
-        img (numpy.ndarray): Frame gambar untuk menampilkan instruksi
+    Menampilkan instruksi penggunaan di layar.
     """
     instructions = [
-        "INSTRUKSI GESTURE:",
-        "1 Jari (Telunjuk) = Menggambar",
-        "4 Jari (tanpa Jempol) = Prediksi Digit",
-        "5 Jari = Hapus Canvas",
-        "Tekan 'q' = Keluar"
+        "INSTRUKSI:",
+        "1 Jari (telunjuk) = Draw",
+        "4 Jari (tanpa jempol) = Submit & Recognize",
+        "5 Jari = Clear Canvas",
+        "ketik 'q' = Quit"
     ]
     
     y_offset = 30
@@ -201,126 +151,118 @@ def displayInstructions(img):
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
 
-def displayLoadingBar(img, fingers):
+def displayReadyButton(img):
     """
-    Menampilkan loading bar saat charging mode drawing.
-    
-    Args:
-        img (numpy.ndarray): Frame gambar untuk menampilkan loading bar
-        fingers (list): Status jari saat ini
+    Menampilkan status ready/drawing button di pojok kanan atas.
     """
     global draw_charge_counter, is_drawing_allowed
     
-    # Tampilkan loading bar hanya saat gesture menggambar dan belum aktif
-    if fingers == [0, 1, 0, 0, 0]:
-        if is_drawing_allowed:
-            # Tampilkan status "MENGGAMBAR"
-            cv2.putText(img, "MENGGAMBAR...", (50, 230), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 2)
-        else:
-            # Tampilkan "SIAP..." dan loading bar
-            cv2.putText(img, "SIAP...", (50, 290), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
-            
-            # Gambar border loading bar
-            cv2.rectangle(img, (50, 230), (250, 260), (0, 0, 255), 3)
-            
-            # Gambar progress loading bar
-            bar_width = int((draw_charge_counter / DRAW_CHARGE_TIME) * 200)
-            cv2.rectangle(img, (50, 230), (50 + bar_width, 260), 
-                         (0, 255, 0), cv2.FILLED)
+    button_x = img.shape[1] - 150
+    button_y = 20
+    button_w = 130
+    button_h = 40
+    
+    if draw_charge_counter > 0 and not is_drawing_allowed:
+        progress = draw_charge_counter / DRAW_CHARGE_TIME
+        
+        overlay = img.copy()
+        cv2.rectangle(overlay, (button_x, button_y), (button_x + button_w, button_y + button_h),
+                     (50, 50, 50), -1)
+        cv2.addWeighted(overlay, 0.7, img, 0.3, 0, img)
+        
+        cv2.rectangle(img, (button_x, button_y), (button_x + button_w, button_y + button_h),
+                     (0, 255, 255), 2)
+        
+        fill_w = int(button_w * progress)
+        cv2.rectangle(img, (button_x, button_y), (button_x + fill_w, button_y + button_h),
+                     (0, 255, 0), -1)
+        
+        cv2.putText(img, "READY...", (button_x + 10, button_y + 28),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+    
+    elif is_drawing_allowed:
+        overlay = img.copy()
+        cv2.rectangle(overlay, (button_x, button_y), (button_x + button_w, button_y + button_h),
+                     (128, 0, 128), -1)
+        cv2.addWeighted(overlay, 0.7, img, 0.3, 0, img)
+        
+        cv2.rectangle(img, (button_x, button_y), (button_x + button_w, button_y + button_h),
+                     (255, 0, 255), 2)
+        
+        cv2.putText(img, "DRAWING", (button_x + 10, button_y + 28),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
 
 
 def displayNotification(img):
     """
-    Menampilkan notifikasi sementara di layar.
-    
-    Args:
-        img (numpy.ndarray): Frame gambar untuk menampilkan notifikasi
+    Menampilkan notifikasi hasil recognition di pojok kanan bawah.
     """
     global notification_text, notification_timer
     
     if notification_timer > 0:
-        # Pilih warna berdasarkan jenis notifikasi
-        if "TERDETEKSI" in notification_text:
-            color = (0, 255, 255)  # Kuning untuk hasil prediksi
-        elif "TIDAK" in notification_text or "KOSONG" in notification_text:
-            color = (0, 0, 255)  # Merah untuk error
-        else:
-            color = (0, 255, 0)  # Hijau untuk sukses
+        text_x = img.shape[1] - 200
+        text_y = img.shape[0] - 20
         
-        cv2.putText(img, notification_text, (400, 100), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 1.5, color, 3)
+        if "ANGKA:" in notification_text:
+            color = (0, 255, 0)
+        elif "TIDAK JELAS" in notification_text or "NOT LOADED" in notification_text:
+            color = (0, 0, 255)
+        else:
+            color = (0, 255, 255)
+        
+        cv2.putText(img, notification_text, (text_x, text_y), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
         notification_timer -= 1
 
 
-# Main loop
-print("Program dimulai! Tekan 'q' untuk keluar.\n")
-print("Cara penggunaan (SIMPLIFIED):")
-print("- Angkat 1 jari (telunjuk) untuk menggambar (tahan hingga loading selesai)")
-print("- Angkat 4 jari (tanpa jempol) untuk prediksi digit yang digambar")
-print("- Angkat 5 jari untuk menghapus canvas")
-print(f"\nDEBUG MODE: {'ON (Visualisasi aktif)' if DEBUG_MODE else 'OFF'}")
-print("Untuk mengaktifkan debug mode, ubah DEBUG_MODE = True di kode")
-print("\n" + "="*60 + "\n")
+def displayFingerStatus(img, fingers):
+    """
+    Menampilkan status jari yang terdeteksi di pojok kiri bawah.
+    """
+    if fingers:
+        finger_text = f"Jari: {fingers}"
+        cv2.putText(img, finger_text, (10, img.shape[0] - 20), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
 
+
+# Main Loop
 while True:
     success, img = cap.read()
     
     if not success:
-        print("Gagal membaca frame dari webcam")
         break
     
-    # Flip gambar agar seperti cermin
     img = cv2.flip(img, 1)
     
-    # Inisialisasi canvas jika belum ada
     if canvas is None:
         canvas = np.zeros_like(img)
     
-    # Deteksi tangan dan dapatkan informasi
     info = getHandInfo(img)
-    
-    fingers = None  # Inisialisasi untuk cek di luar blok if
+    fingers = None
     
     if info:
         fingers, lmlist = info
         previousPosition, canvas = draw(info, previousPosition, canvas, img)
-        
-        # Tampilkan status jari di layar
-        finger_status = f"Jari: {fingers}"
-        cv2.putText(img, finger_status, (10, img.shape[0] - 70), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+        displayFingerStatus(img, fingers)
     else:
-        # Reset state jika tidak ada tangan
         previousPosition = None
         is_drawing_allowed = False
         draw_charge_counter = 0
     
-    # Gabungkan gambar kamera dengan canvas
     combinedImage = cv2.addWeighted(img, 0.7, canvas, 0.3, 0)
     
-    # Tampilkan instruksi
     displayInstructions(combinedImage)
     
-    # Tampilkan loading bar jika sedang charging
     if fingers is not None:
-        displayLoadingBar(combinedImage, fingers)
+        displayReadyButton(combinedImage)
     
-    # Tampilkan notifikasi
     displayNotification(combinedImage)
     
-    # Tampilkan hasil
-    cv2.imshow("DO THE MATH! - Gesture Drawing & Digit Recognition (ONNX)", combinedImage)
-    cv2.imshow("Canvas Only", canvas)
+    cv2.imshow("DO THE MATH", combinedImage)
     
-    # Tekan 'q' untuk keluar
     if cv2.waitKey(1) & 0xFF == ord('q'):
-        print("\n" + "="*60)
-        print("Program dihentikan.")
-        print("="*60)
         break
 
-# Bersihkan resources
 cap.release()
 cv2.destroyAllWindows()
