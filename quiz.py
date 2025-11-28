@@ -9,23 +9,25 @@ import cv2
 import pygame
 import os
 import json
-from cvzone.HandTrackingModule import HandDetector
-from digit_recognition import load_model, recognize_multi_digit
 import threading
 import time
+from digit_recognition import load_model, recognize_multi_digit
 
-# ======================= KONSTANTA =======================
-DRAW_CHARGE_TIME = 30
-NOTIFICATION_DURATION = 60
-BRUSH_SIZE = 20
-
-# Dimensi window
-WINDOW_WIDTH = 1280
-WINDOW_HEIGHT = 720
-
-# Area drawing (tengah-kanan, memberikan space luas)
-DRAWING_AREA_X = 300
-DRAWING_AREA_WIDTH = WINDOW_WIDTH - DRAWING_AREA_X
+# Import dari gesture_tracking library
+from gesture_tracking import (
+    DRAW_CHARGE_TIME,
+    NOTIFICATION_DURATION,
+    BRUSH_SIZE,
+    WINDOW_WIDTH,
+    WINDOW_HEIGHT,
+    DRAWING_AREA_X,
+    DRAWING_AREA_WIDTH,
+    create_detector,
+    create_gesture_state,
+    getHandInfo,
+    process_gesture,
+    draw_status_indicator
+)
 
 # ======================= QUIZ MANAGER =======================
 class QuizManager:
@@ -341,89 +343,7 @@ class QuizManager:
         self.play_question_audio()
 
 
-# ======================= GESTURE TRACKER =======================
-class GestureTracker:
-    def __init__(self):
-        """Inisialisasi gesture tracker"""
-        self.detector = HandDetector(
-            staticMode=False, 
-            maxHands=1, 
-            modelComplexity=1,
-            detectionCon=0.7, 
-            minTrackCon=0.5
-        )
-        
-        self.previousPosition = None
-        self.draw_charge_counter = 0
-        self.is_drawing_allowed = False
-        
-    def get_hand_info(self, img):
-        """Mendapatkan informasi tangan dari frame"""
-        hands, img = self.detector.findHands(img, draw=True, flipType=True)
-        
-        if hands:
-            hand1 = hands[0]
-            lmList = hand1["lmList"]
-            fingers = self.detector.fingersUp(hand1)
-            return fingers, lmList
-        else:
-            return None
-    
-    def process_gesture(self, info, canvas, img):
-        """
-        Memproses gesture tangan untuk drawing
-        
-        Returns:
-            tuple: (canvas, action)
-                action: 'draw', 'clear', 'submit', atau None
-        """
-        fingers, lmlist = info
-        action = None
-        
-        # Mode Drawing: 1 jari (telunjuk)
-        if fingers == [0, 1, 0, 0, 0]:
-            currentPosition = lmlist[8][0:2]
-            
-            if not self.is_drawing_allowed:
-                self.draw_charge_counter += 1
-                if self.draw_charge_counter >= DRAW_CHARGE_TIME:
-                    self.is_drawing_allowed = True
-                    self.previousPosition = currentPosition
-            
-            if self.is_drawing_allowed:
-                if self.previousPosition is None:
-                    self.previousPosition = currentPosition
-                
-                # Draw hanya di area drawing (kanan)
-                cv2.line(canvas, currentPosition, self.previousPosition,
-                        (255, 255, 255), BRUSH_SIZE)
-                cv2.circle(canvas, currentPosition, 5, (255, 255, 255), cv2.FILLED)
-                
-                self.previousPosition = currentPosition
-                action = 'draw'
-        
-        # Mode Clear: 5 jari
-        elif fingers == [1, 1, 1, 1, 1]:
-            canvas = np.zeros_like(img)
-            self.previousPosition = None
-            self.is_drawing_allowed = False
-            self.draw_charge_counter = 0
-            action = 'clear'
-        
-        # Mode Submit: 4 jari (tanpa jempol)
-        elif fingers == [0, 1, 1, 1, 1]:
-            self.previousPosition = None
-            self.is_drawing_allowed = False
-            self.draw_charge_counter = 0
-            action = 'submit'
-        
-        # Mode Idle
-        else:
-            self.previousPosition = None
-            self.is_drawing_allowed = False
-            self.draw_charge_counter = 0
-        
-        return canvas, action
+# GestureTracker class removed - using gesture_tracking library functions instead
 
 
 # ======================= UI MANAGER =======================
@@ -434,7 +354,7 @@ class UIManager:
         self.notification_timer = 0
         self.notification_color = (255, 255, 255)
         
-    def draw_left_panel(self, img, quiz_manager, gesture_tracker):
+    def draw_left_panel(self, img, quiz_manager, gesture_state):
         """
         Menggambar panel kiri dengan instruksi dan status
         """
@@ -497,43 +417,11 @@ class UIManager:
         
         # Drawing status indicator
         y_offset += 20
-        self._draw_status_indicator(img, gesture_tracker, y_offset)
-        
-    def _draw_status_indicator(self, img, gesture_tracker, y_pos):
-        """Menggambar indikator status drawing"""
-        indicator_x = 20
-        indicator_y = y_pos
-        indicator_w = 260
-        indicator_h = 40
-        
-        if gesture_tracker.draw_charge_counter > 0 and not gesture_tracker.is_drawing_allowed:
-            # Charging
-            progress = gesture_tracker.draw_charge_counter / DRAW_CHARGE_TIME
-            
-            cv2.rectangle(img, (indicator_x, indicator_y),
-                         (indicator_x + indicator_w, indicator_y + indicator_h),
-                         (0, 255, 255), 2)
-            
-            fill_w = int(indicator_w * progress)
-            cv2.rectangle(img, (indicator_x, indicator_y),
-                         (indicator_x + fill_w, indicator_y + indicator_h),
-                         (0, 255, 0), -1)
-            
-            cv2.putText(img, "READY...", (indicator_x + 70, indicator_y + 27),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
-        
-        elif gesture_tracker.is_drawing_allowed:
-            # Drawing mode active
-            cv2.rectangle(img, (indicator_x, indicator_y),
-                         (indicator_x + indicator_w, indicator_y + indicator_h),
-                         (255, 0, 255), -1)
-            
-            cv2.rectangle(img, (indicator_x, indicator_y),
-                         (indicator_x + indicator_w, indicator_y + indicator_h),
-                         (255, 255, 255), 2)
-            
-            cv2.putText(img, "DRAWING", (indicator_x + 60, indicator_y + 27),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        draw_status_indicator(img, gesture_state, 20, y_offset)
+    
+    def _draw_status_indicator(self, img, gesture_state, y_pos):
+        """Deprecated - using draw_status_indicator from gesture_tracking library"""
+        pass
     
     def draw_question_panel(self, img, quiz_manager):
         """
@@ -661,8 +549,11 @@ def main():
         return
     
     quiz_manager = QuizManager(data_folder="data", total_questions=15)
-    gesture_tracker = GestureTracker()
     ui_manager = UIManager()
+    
+    # Initialize gesture tracking from library
+    detector = create_detector()
+    gesture_state = create_gesture_state()
     
     # Play audio soal pertama
     quiz_manager.play_question_audio()
@@ -700,11 +591,11 @@ def main():
                 canvas = np.zeros_like(img)
             continue
         
-        # Get hand info
-        hand_info = gesture_tracker.get_hand_info(img)
+        # Get hand info using library function
+        hand_info = getHandInfo(detector, img)
         
         if hand_info:
-            canvas, action = gesture_tracker.process_gesture(hand_info, canvas, img)
+            canvas, action, gesture_state = process_gesture(hand_info, gesture_state, canvas, img)
             
             # Handle actions dengan cooldown
             if action and action != last_action and action_cooldown == 0:
@@ -761,7 +652,7 @@ def main():
         combined_img = cv2.addWeighted(img, 0.7, canvas, 0.3, 0)
         
         # Draw UI elements
-        ui_manager.draw_left_panel(combined_img, quiz_manager, gesture_tracker)
+        ui_manager.draw_left_panel(combined_img, quiz_manager, gesture_state)
         ui_manager.draw_question_panel(combined_img, quiz_manager)
         ui_manager.draw_notification(combined_img)
         

@@ -1,46 +1,66 @@
 """
 Modul Gesture Tracking untuk DO THE MATH
-Menggunakan CVZone HandDetector dan Digit Recognizer
+Library untuk hand gesture detection dan drawing
 """
 
 import numpy as np
 import cv2
 from cvzone.HandTrackingModule import HandDetector
-from digit_recognition import load_model, recognize_multi_digit
 
-# Konstanta
+# ======================= KONSTANTA =======================
 DRAW_CHARGE_TIME = 30
-NOTIFICATION_DURATION = 30
+NOTIFICATION_DURATION = 60
 BRUSH_SIZE = 20
 
-# Inisialisasi
-cap = cv2.VideoCapture(0)
-cap.set(3, 1280)
-cap.set(4, 720)
+# Dimensi window
+WINDOW_WIDTH = 1280
+WINDOW_HEIGHT = 720
 
-detector = HandDetector(staticMode=False, maxHands=1, modelComplexity=1, 
-                        detectionCon=0.7, minTrackCon=0.5)
-
-try:
-    session = load_model()
-    RECOGNIZER_LOADED = True
-except:
-    RECOGNIZER_LOADED = False
-    session = None
-
-# Variabel state
-previousPosition = None
-canvas = None
-draw_charge_counter = 0
-is_drawing_allowed = False
-notification_text = ""
-notification_timer = 0
+# Area drawing
+DRAWING_AREA_X = 300
+DRAWING_AREA_WIDTH = WINDOW_WIDTH - DRAWING_AREA_X
 
 
-def getHandInfo(img):
+# ======================= FACTORY FUNCTIONS =======================
+def create_detector():
     """
-    Mendapatkan informasi tangan dari frame.
+    Factory function untuk membuat HandDetector instance
     
+    Returns:
+        HandDetector: Configured hand detector
+    """
+    return HandDetector(
+        staticMode=False,
+        maxHands=1,
+        modelComplexity=1,
+        detectionCon=0.7,
+        minTrackCon=0.5
+    )
+
+
+def create_gesture_state():
+    """
+    Factory function untuk membuat gesture state dictionary
+    
+    Returns:
+        dict: Initial gesture state
+    """
+    return {
+        'previousPosition': None,
+        'draw_charge_counter': 0,
+        'is_drawing_allowed': False
+    }
+
+
+# ======================= HAND DETECTION =======================
+def getHandInfo(detector, img):
+    """
+    Mendapatkan informasi tangan dari frame
+    
+    Args:
+        detector: HandDetector instance
+        img: Frame gambar
+        
     Returns:
         tuple: (fingers, lmList) atau None jika tidak ada tangan terdeteksi
     """
@@ -55,213 +75,109 @@ def getHandInfo(img):
         return None
 
 
-def draw(info, previousPosition, canvas, img):
+# ======================= GESTURE PROCESSING =======================
+def process_gesture(info, state, canvas, img, brush_size=BRUSH_SIZE):
     """
-    Menangani logika drawing berdasarkan gesture tangan.
+    Memproses gesture tangan untuk drawing
     
     Args:
-        info: Tuple (fingers, lmlist)
-        previousPosition: Posisi sebelumnya untuk drawing
+        info: Tuple (fingers, lmlist) dari getHandInfo
+        state: Dictionary dengan gesture state
         canvas: Canvas untuk menggambar
         img: Frame gambar
+        brush_size: Ukuran brush untuk drawing
         
     Returns:
-        tuple: (currentPosition, canvas)
+        tuple: (canvas, action, updated_state)
+            action: 'draw', 'clear', 'submit', atau None
     """
-    global draw_charge_counter, is_drawing_allowed, notification_text, notification_timer
-    
     fingers, lmlist = info
-    currentPosition = None
+    action = None
     
     # Mode Drawing: 1 jari (telunjuk)
     if fingers == [0, 1, 0, 0, 0]:
         currentPosition = lmlist[8][0:2]
         
-        if not is_drawing_allowed:
-            draw_charge_counter += 1
-            if draw_charge_counter >= DRAW_CHARGE_TIME:
-                is_drawing_allowed = True
-                previousPosition = currentPosition
+        if not state['is_drawing_allowed']:
+            state['draw_charge_counter'] += 1
+            if state['draw_charge_counter'] >= DRAW_CHARGE_TIME:
+                state['is_drawing_allowed'] = True
+                state['previousPosition'] = currentPosition
         
-        if is_drawing_allowed:
-            if previousPosition is None:
-                previousPosition = currentPosition
+        if state['is_drawing_allowed']:
+            if state['previousPosition'] is None:
+                state['previousPosition'] = currentPosition
             
-            cv2.line(canvas, currentPosition, previousPosition, 
-                    (255, 255, 255), BRUSH_SIZE)
+            cv2.line(canvas, currentPosition, state['previousPosition'],
+                    (255, 255, 255), brush_size)
             cv2.circle(canvas, currentPosition, 5, (255, 255, 255), cv2.FILLED)
             
-            previousPosition = currentPosition
+            state['previousPosition'] = currentPosition
+            action = 'draw'
     
-    # Mode Clear: 5 jari (tidak perlu tunggu notification timer)
+    # Mode Clear: 5 jari
     elif fingers == [1, 1, 1, 1, 1]:
         canvas = np.zeros_like(img)
-        if notification_timer == 0:
-            notification_text = "Hapus Canvas"
-            notification_timer = NOTIFICATION_DURATION
-        
-        previousPosition = None
-        is_drawing_allowed = False
-        draw_charge_counter = 0
+        state['previousPosition'] = None
+        state['is_drawing_allowed'] = False
+        state['draw_charge_counter'] = 0
+        action = 'clear'
     
-    # Mode Submit dan Recognize: 4 jari (tanpa jempol)
+    # Mode Submit: 4 jari (tanpa jempol)
     elif fingers == [0, 1, 1, 1, 1]:
-        if notification_timer == 0:
-            if RECOGNIZER_LOADED:
-                result, confidence = recognize_multi_digit(session, canvas, max_digits=3)
-                
-                if result is not None and confidence > 50:
-                    notification_text = f"ANGKA: {result}"
-                    cv2.imwrite("hasil_gambar.png", canvas)
-                else:
-                    notification_text = "TIDAK JELAS!"
-            else:
-                notification_text = "MODEL NOT LOADED!"
-            
-            notification_timer = NOTIFICATION_DURATION
-        
-        previousPosition = None
-        is_drawing_allowed = False
-        draw_charge_counter = 0
+        state['previousPosition'] = None
+        state['is_drawing_allowed'] = False
+        state['draw_charge_counter'] = 0
+        action = 'submit'
     
     # Mode Idle
     else:
-        previousPosition = None
-        is_drawing_allowed = False
-        draw_charge_counter = 0
+        state['previousPosition'] = None
+        state['is_drawing_allowed'] = False
+        state['draw_charge_counter'] = 0
     
-    return currentPosition, canvas
+    return canvas, action, state
 
 
-def displayInstructions(img):
+# ======================= UI DISPLAY FUNCTIONS =======================
+def draw_status_indicator(img, state, x=20, y=500):
     """
-    Menampilkan instruksi penggunaan di layar.
-    """
-    instructions = [
-        "INSTRUKSI:",
-        "1 Jari (telunjuk) = Draw",
-        "4 Jari (tanpa jempol) = Submit & Recognize",
-        "5 Jari = Clear Canvas",
-        "ketik 'q' = Quit"
-    ]
+    Menggambar indikator status drawing
     
-    y_offset = 30
-    for i, text in enumerate(instructions):
-        cv2.putText(img, text, (10, y_offset + (i * 30)), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-
-
-def displayReadyButton(img):
+    Args:
+        img: Frame gambar
+        state: Dictionary dengan gesture state
+        x: Posisi x indikator
+        y: Posisi y indikator
     """
-    Menampilkan status ready/drawing button di pojok kanan atas.
-    """
-    global draw_charge_counter, is_drawing_allowed
+    indicator_w = 260
+    indicator_h = 40
     
-    button_x = img.shape[1] - 150
-    button_y = 20
-    button_w = 130
-    button_h = 40
-    
-    if draw_charge_counter > 0 and not is_drawing_allowed:
-        progress = draw_charge_counter / DRAW_CHARGE_TIME
+    if state['draw_charge_counter'] > 0 and not state['is_drawing_allowed']:
+        # Charging
+        progress = state['draw_charge_counter'] / DRAW_CHARGE_TIME
         
-        overlay = img.copy()
-        cv2.rectangle(overlay, (button_x, button_y), (button_x + button_w, button_y + button_h),
-                     (50, 50, 50), -1)
-        cv2.addWeighted(overlay, 0.7, img, 0.3, 0, img)
-        
-        cv2.rectangle(img, (button_x, button_y), (button_x + button_w, button_y + button_h),
+        cv2.rectangle(img, (x, y),
+                     (x + indicator_w, y + indicator_h),
                      (0, 255, 255), 2)
         
-        fill_w = int(button_w * progress)
-        cv2.rectangle(img, (button_x, button_y), (button_x + fill_w, button_y + button_h),
+        fill_w = int(indicator_w * progress)
+        cv2.rectangle(img, (x, y),
+                     (x + fill_w, y + indicator_h),
                      (0, 255, 0), -1)
         
-        cv2.putText(img, "READY...", (button_x + 10, button_y + 28),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        cv2.putText(img, "READY...", (x + 70, y + 27),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
     
-    elif is_drawing_allowed:
-        overlay = img.copy()
-        cv2.rectangle(overlay, (button_x, button_y), (button_x + button_w, button_y + button_h),
-                     (128, 0, 128), -1)
-        cv2.addWeighted(overlay, 0.7, img, 0.3, 0, img)
+    elif state['is_drawing_allowed']:
+        # Drawing mode active
+        cv2.rectangle(img, (x, y),
+                     (x + indicator_w, y + indicator_h),
+                     (255, 0, 255), -1)
         
-        cv2.rectangle(img, (button_x, button_y), (button_x + button_w, button_y + button_h),
-                     (255, 0, 255), 2)
+        cv2.rectangle(img, (x, y),
+                     (x + indicator_w, y + indicator_h),
+                     (255, 255, 255), 2)
         
-        cv2.putText(img, "DRAWING", (button_x + 10, button_y + 28),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-
-
-def displayNotification(img):
-    """
-    Menampilkan notifikasi hasil recognition di pojok kanan bawah.
-    """
-    global notification_text, notification_timer
-    
-    if notification_timer > 0:
-        text_x = img.shape[1] - 200
-        text_y = img.shape[0] - 20
-        
-        if "ANGKA:" in notification_text:
-            color = (0, 255, 0)
-        elif "TIDAK JELAS" in notification_text or "NOT LOADED" in notification_text:
-            color = (0, 0, 255)
-        else:
-            color = (0, 255, 255)
-        
-        cv2.putText(img, notification_text, (text_x, text_y), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-        notification_timer -= 1
-
-
-def displayFingerStatus(img, fingers):
-    """
-    Menampilkan status jari yang terdeteksi di pojok kiri bawah.
-    """
-    if fingers:
-        finger_text = f"Jari: {fingers}"
-        cv2.putText(img, finger_text, (10, img.shape[0] - 20), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-
-
-# Main Loop
-while True:
-    success, img = cap.read()
-    
-    if not success:
-        break
-    
-    img = cv2.flip(img, 1)
-    
-    if canvas is None:
-        canvas = np.zeros_like(img)
-    
-    info = getHandInfo(img)
-    fingers = None
-    
-    if info:
-        fingers, lmlist = info
-        previousPosition, canvas = draw(info, previousPosition, canvas, img)
-        displayFingerStatus(img, fingers)
-    else:
-        previousPosition = None
-        is_drawing_allowed = False
-        draw_charge_counter = 0
-    
-    combinedImage = cv2.addWeighted(img, 0.7, canvas, 0.3, 0)
-    
-    displayInstructions(combinedImage)
-    
-    if fingers is not None:
-        displayReadyButton(combinedImage)
-    
-    displayNotification(combinedImage)
-    
-    cv2.imshow("DO THE MATH", combinedImage)
-    
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-cap.release()
-cv2.destroyAllWindows()
+        cv2.putText(img, "DRAWING", (x + 60, y + 27),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
