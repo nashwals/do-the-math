@@ -1,3 +1,5 @@
+![Maths Quiz Presentation in Colourful Fun Style ](https://github.com/user-attachments/assets/df0883c5-9d70-4fb4-9ff1-ab300038c70e)
+
 # DO THE MATH!
 
 > Project Tugas Besar Sistem Teknologi Multimedia (IF25-40305)
