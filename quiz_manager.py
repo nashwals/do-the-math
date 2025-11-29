@@ -8,9 +8,6 @@ Modul ini mengelola:
 3. Randomisasi urutan soal
 4. Tracking progress dan scoring
 5. Validasi jawaban user
-
-Author: [Nama Anda]
-Date: November 2025
 """
 
 import os
