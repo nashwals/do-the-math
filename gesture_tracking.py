@@ -1,7 +1,6 @@
 """
 Modul Gesture Tracking untuk DO THE MATH
 Menggunakan CVZone HandDetector dan Digit Recognizer
-DENGAN INTRO SCREEN YANG KEREN!
 """
 
 import numpy as np
@@ -17,6 +16,12 @@ from digit_recognition import load_model, recognize_multi_digit
 DRAW_CHARGE_TIME = 30
 NOTIFICATION_DURATION = 30
 BRUSH_SIZE = 20
+
+# Window dimensions
+WINDOW_WIDTH = 1280
+WINDOW_HEIGHT = 720
+DRAWING_AREA_X = 300  # Left panel width
+DRAWING_AREA_WIDTH = WINDOW_WIDTH - DRAWING_AREA_X
 
 # INISIALISASI
 cap = cv2.VideoCapture(0)
@@ -463,6 +468,191 @@ def displayFingerStatus(img, fingers):
         
         cv2.putText(img, finger_text, (10, height - 20), 
                    font, font_scale, (0, 255, 255), thickness)
+
+
+# ======================= UI MANAGER =======================
+class UIManager:
+    def __init__(self):
+        """Inisialisasi UI Manager"""
+        self.notification_text = ""
+        self.notification_timer = 0
+        self.notification_color = (255, 255, 255)
+        
+    def draw_left_panel(self, img, quiz_manager, gesture_state):
+        """
+        Menggambar panel kiri dengan instruksi dan status
+        """
+        panel_width = DRAWING_AREA_X
+        
+        # Background panel kiri dengan transparansi
+        overlay = img.copy()
+        cv2.rectangle(overlay, (0, 0), (panel_width, WINDOW_HEIGHT),
+                     (40, 40, 40), -1)
+        cv2.addWeighted(overlay, 0.85, img, 0.15, 0, img)
+        
+        # Border panel
+        cv2.line(img, (panel_width, 0), (panel_width, WINDOW_HEIGHT),
+                (100, 100, 100), 2)
+        
+        y_offset = 30
+        
+        # Title
+        cv2.putText(img, "DO THE MATH!", (20, y_offset),
+                   cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 255, 255), 2)
+        y_offset += 50
+        
+        # Progress
+        progress_text = f"Soal: {quiz_manager.current_question}/{quiz_manager.total_questions}"
+        cv2.putText(img, progress_text, (20, y_offset),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        y_offset += 30
+        
+        score_text = f"Skor: {quiz_manager.score}"
+        cv2.putText(img, score_text, (20, y_offset),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        y_offset += 50
+        
+        # Instruksi
+        cv2.putText(img, "INSTRUKSI:", (20, y_offset),
+                   cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 255, 0), 2)
+        y_offset += 35
+        
+        instructions = [
+            "1 Jari",
+            "  (telunjuk)",
+            "  = Gambar jawaban",
+            "",
+            "4 Jari",
+            "  (tanpa jempol)",
+            "  = Submit jawaban",
+            "",
+            "5 Jari",
+            "  = Hapus canvas",
+            "",
+            "Tekan 'Q' = Quit",
+            "Tekan 'R' = Restart",
+            "Tekan 'N' = Next"
+        ]
+        
+        for instruction in instructions:
+            cv2.putText(img, instruction, (20, y_offset),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
+            y_offset += 25
+        
+        # Drawing status indicator
+        y_offset += 20
+        draw_status_indicator(img, gesture_state, 20, y_offset)
+    
+    def _draw_status_indicator(self, img, gesture_state, y_pos):
+        """Deprecated - using draw_status_indicator from gesture_tracking library"""
+        pass
+    
+    def draw_question_panel(self, img, quiz_manager):
+        """
+        Menggambar panel soal di bagian atas kanan
+        """
+        question = quiz_manager.get_current_question()
+        
+        if question and question['image'] is not None:
+            question_img = question['image']
+            
+            # Resize soal agar tidak terlalu besar
+            max_width = 400
+            max_height = 150
+            
+            h, w = question_img.shape[:2]
+            scale = min(max_width / w, max_height / h)
+            new_w = int(w * scale)
+            new_h = int(h * scale)
+            
+            resized_question = cv2.resize(question_img, (new_w, new_h))
+            
+            # Posisi soal di kanan atas
+            x_pos = WINDOW_WIDTH - new_w - 20
+            y_pos = 20
+            
+            # Background untuk soal
+            overlay = img.copy()
+            padding = 10
+            cv2.rectangle(overlay,
+                         (x_pos - padding, y_pos - padding),
+                         (x_pos + new_w + padding, y_pos + new_h + padding),
+                         (255, 255, 255), -1)
+            cv2.addWeighted(overlay, 0.9, img, 0.1, 0, img)
+            
+            # Border
+            cv2.rectangle(img,
+                         (x_pos - padding, y_pos - padding),
+                         (x_pos + new_w + padding, y_pos + new_h + padding),
+                         (0, 255, 0), 3)
+            
+            # Paste soal
+            img[y_pos:y_pos+new_h, x_pos:x_pos+new_w] = resized_question
+    
+    def show_notification(self, text, color=(255, 255, 255), duration=NOTIFICATION_DURATION):
+        """Menampilkan notifikasi"""
+        self.notification_text = text
+        self.notification_color = color
+        self.notification_timer = duration
+    
+    def draw_notification(self, img):
+        """Menggambar notifikasi di layar"""
+        if self.notification_timer > 0:
+            # Posisi notifikasi di tengah bawah
+            text_size = cv2.getTextSize(self.notification_text,
+                                       cv2.FONT_HERSHEY_DUPLEX, 1.2, 3)[0]
+            
+            text_x = (WINDOW_WIDTH - text_size[0]) // 2
+            text_y = WINDOW_HEIGHT - 60
+            
+            # Background notifikasi
+            overlay = img.copy()
+            padding = 20
+            cv2.rectangle(overlay,
+                         (text_x - padding, text_y - text_size[1] - padding),
+                         (text_x + text_size[0] + padding, text_y + padding),
+                         (50, 50, 50), -1)
+            cv2.addWeighted(overlay, 0.8, img, 0.2, 0, img)
+            
+            # Border
+            cv2.rectangle(img,
+                         (text_x - padding, text_y - text_size[1] - padding),
+                         (text_x + text_size[0] + padding, text_y + padding),
+                         self.notification_color, 2)
+            
+            # Text
+            cv2.putText(img, self.notification_text, (text_x, text_y),
+                       cv2.FONT_HERSHEY_DUPLEX, 1.2, self.notification_color, 3)
+            
+            self.notification_timer -= 1
+    
+    def draw_quiz_complete(self, img, quiz_manager):
+        """Menggambar layar quiz selesai"""
+        overlay = img.copy()
+        cv2.rectangle(overlay, (0, 0), (WINDOW_WIDTH, WINDOW_HEIGHT),
+                     (0, 0, 0), -1)
+        cv2.addWeighted(overlay, 0.8, img, 0.2, 0, img)
+        
+        # Title
+        cv2.putText(img, "QUIZ SELESAI!", (WINDOW_WIDTH//2 - 200, 200),
+                   cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 255, 0), 4)
+        
+        # Score
+        score_text = f"Skor Akhir: {quiz_manager.score}/{quiz_manager.total_questions}"
+        cv2.putText(img, score_text, (WINDOW_WIDTH//2 - 200, 300),
+                   cv2.FONT_HERSHEY_DUPLEX, 1.2, (255, 255, 255), 3)
+        
+        # Percentage
+        percentage = (quiz_manager.score / quiz_manager.total_questions) * 100
+        percentage_text = f"Persentase: {percentage:.1f}%"
+        cv2.putText(img, percentage_text, (WINDOW_WIDTH//2 - 180, 370),
+                   cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+        
+        # Instruction
+        cv2.putText(img, "Tekan 'R' untuk restart", (WINDOW_WIDTH//2 - 180, 450),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+        cv2.putText(img, "Tekan 'Q' untuk keluar", (WINDOW_WIDTH//2 - 180, 500),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
 
 
 # MAIN LOOP 
