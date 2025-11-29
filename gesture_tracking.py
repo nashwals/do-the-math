@@ -13,12 +13,12 @@ import os
 from cvzone.HandTrackingModule import HandDetector
 from digit_recognition import load_model, recognize_multi_digit
 
-# ==================== KONSTANTA ====================
+# KONSTANTA
 DRAW_CHARGE_TIME = 30
 NOTIFICATION_DURATION = 30
 BRUSH_SIZE = 20
 
-# ==================== INISIALISASI ====================
+# INISIALISASI
 cap = cv2.VideoCapture(0)
 cap.set(3, 1280)
 cap.set(4, 720)
@@ -66,7 +66,7 @@ except Exception as e:
     session = None
     print(f"Error loading model: {e}")
 
-# ==================== VARIABEL STATE ====================
+# VARIABEL STATE 
 previousPosition = None
 canvas = None
 draw_charge_counter = 0
@@ -79,7 +79,7 @@ show_intro = True  # Mulai dengan intro screen
 audio_played = False  # Flag untuk audio sudah diplay atau belum
 
 
-# ==================== HELPER FUNCTIONS ====================
+# HELPER FUNCTIONS 
 
 def get_scaled_font(base_size):
     """Mengambil ukuran font yang sudah discale"""
@@ -91,24 +91,11 @@ def get_scaled_thickness(base_thickness):
     return max(1, int(base_thickness * min_scale))
 
 
-# ==================== INTRO SCREEN FUNCTION ====================
+# INTRO SCREEN FUNCTION
 
 def draw_attract_mode(img):
     """
-    Fungsi untuk menggambar layar intro game (ATTRACT MODE)
-    
-    Fitur yang ada di intro screen ini:
-    - Overlay gelap dengan efek gradient
-    - Background pattern grid yang subtle
-    - Judul utama dengan efek bayangan
-    - Kotak instruksi dengan transparansi
-    - Icon gesture (satu jari, empat jari, lima jari)
-    - Tombol "Tekan SPACE untuk Mulai" yang berkedip
-    
-    Filosofi desain:
-    - UI yang clean dan modern
-    - Kontras tinggi biar gampang dibaca
-    - Responsive scaling buat berbagai resolusi layar
+    Fungsi untuk layar intro game
     """
     # Bikin overlay gelap di atas video
     overlay = img.copy()
@@ -266,7 +253,7 @@ def draw_attract_mode(img):
                font, cta_font_scale, cta_color, cta_thickness)
 
 
-# ==================== GESTURE FUNCTIONS ====================
+# GESTURE FUNCTIONS 
 
 def getHandInfo(img):
     """
@@ -366,7 +353,7 @@ def draw(info, previousPosition, canvas, img):
     return currentPosition, canvas
 
 
-# ==================== UI DISPLAY FUNCTIONS ====================
+# UI DISPLAY FUNCTIONS 
 
 def displayInstructions(img):
     """
@@ -478,14 +465,11 @@ def displayFingerStatus(img, fingers):
                    font, font_scale, (0, 255, 255), thickness)
 
 
-# ==================== MAIN LOOP ====================
+# MAIN LOOP 
 
-print("\n" + "="*50)
 print("DO THE MATH - Digit Recognition dengan Gesture")
-print("="*50)
 print("Tekan SPACE untuk toggle intro screen")
 print("Tekan Q untuk keluar")
-print("="*50 + "\n")
 
 def play_intro_audio():
     """Helper function untuk play audio intro"""
