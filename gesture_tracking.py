@@ -1,747 +1,220 @@
 """
-Modul Gesture Tracking untuk DO THE MATH
-Menggunakan CVZone HandDetector dan Digit Recognizer
+Gesture Tracking Module untuk DO THE MATH!
+==========================================
+
+Modul ini mengelola:
+1. Hand detection dan tracking menggunakan MediaPipe
+2. Gesture recognition (1 jari, 4 jari, 5 jari)
+3. Drawing canvas management
+4. Gesture-based interactions
 """
 
 import numpy as np
 import cv2
-import time
-import math
-import pygame
-import os
 from cvzone.HandTrackingModule import HandDetector
-from digit_recognition import load_model, recognize_multi_digit
-
-# KONSTANTA
-DRAW_CHARGE_TIME = 30
-NOTIFICATION_DURATION = 30
-BRUSH_SIZE = 20
-
-# Window dimensions
-WINDOW_WIDTH = 1280
-WINDOW_HEIGHT = 720
-DRAWING_AREA_X = 300  # Left panel width
-DRAWING_AREA_WIDTH = WINDOW_WIDTH - DRAWING_AREA_X
-
-# INISIALISASI
-cap = cv2.VideoCapture(0)
-cap.set(3, 1280)
-cap.set(4, 720)
-
-# Ambil resolusi asli dari webcam
-width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-print(f"Resolusi kamera: {width}x{height}")
-
-# Hitung faktor scaling untuk responsive design
-scale_x = width / 1280.0
-scale_y = height / 720.0
-min_scale = min(scale_x, scale_y)
-
-print(f"Faktor skala - X: {scale_x:.2f}, Y: {scale_y:.2f}")
-
-# Inisialisasi pygame untuk audio
-pygame.mixer.init()
-
-# Load audio intro (jika ada)
-intro_audio_path = "assets/audio/opening.wav"
-audio_loaded = False
-if os.path.exists(intro_audio_path):
-    try:
-        pygame.mixer.music.load(intro_audio_path)
-        audio_loaded = True
-        print("Audio intro berhasil dimuat!")
-    except Exception as e:
-        print(f"Error loading audio: {e}")
-        audio_loaded = False
-else:
-    print(f"File audio tidak ditemukan: {intro_audio_path}")
-    audio_loaded = False
-
-detector = HandDetector(staticMode=False, maxHands=1, modelComplexity=1, 
-                        detectionCon=0.7, minTrackCon=0.5)
-
-try:
-    session = load_model()
-    RECOGNIZER_LOADED = True
-    print("Model digit recognition berhasil dimuat")
-except Exception as e:
-    RECOGNIZER_LOADED = False
-    session = None
-    print(f"Error loading model: {e}")
-
-# VARIABEL STATE 
-previousPosition = None
-canvas = None
-draw_charge_counter = 0
-is_drawing_allowed = False
-notification_text = ""
-notification_timer = 0
-
-# State untuk intro screen
-show_intro = True  # Mulai dengan intro screen
-audio_played = False  # Flag untuk audio sudah diplay atau belum
+from typing import Optional, Tuple
 
 
-# HELPER FUNCTIONS 
-
-def get_scaled_font(base_size):
-    """Mengambil ukuran font yang sudah discale"""
-    return max(0.4, base_size * min_scale)
-
-
-def get_scaled_thickness(base_thickness):
-    """Mengambil ketebalan garis yang sudah discale"""
-    return max(1, int(base_thickness * min_scale))
-
-
-# INTRO SCREEN FUNCTION
-
-def draw_attract_mode(img):
+class GestureController:
     """
-    Fungsi untuk layar intro game
+    Class untuk mengelola gesture tracking dan drawing canvas.
+    
+    Attributes:
+        detector (HandDetector): MediaPipe hand detector
+        draw_charge_time (int): Frame yang dibutuhkan untuk aktivasi drawing
+        brush_size (int): Ukuran brush untuk menggambar
+        draw_charge_counter (int): Counter untuk charging draw mode
+        is_drawing_allowed (bool): Flag apakah drawing sudah aktif
+        previous_position (tuple): Posisi finger landmark sebelumnya
     """
-    # Bikin overlay gelap di atas video
-    overlay = img.copy()
-    cv2.rectangle(overlay, (0, 0), (width, height), (0, 0, 0), -1)
-    cv2.addWeighted(overlay, 0.6, img, 0.4, 0, img)
     
-    # Bikin background pattern grid yang halus
-    pattern_overlay = img.copy()
-    grid_spacing = int(80 * min_scale)
-    
-    # Gambar garis vertikal
-    for x in range(0, width, grid_spacing):
-        cv2.line(pattern_overlay, (x, 0), (x, height), (30, 30, 30), 1)
-    
-    # Gambar garis horizontal
-    for y in range(0, height, grid_spacing):
-        cv2.line(pattern_overlay, (0, y), (width, y), (30, 30, 30), 1)
-    
-    # Blend pattern dengan opacity rendah biar ga terlalu kelihatan
-    cv2.addWeighted(pattern_overlay, 0.15, img, 0.85, 0, img)
-    
-    # Gambar judul utama dengan efek shadow
-    title = "DO THE MATH!"
-    title_font = cv2.FONT_HERSHEY_TRIPLEX  # Font khusus buat judul
-    title_font_scale = get_scaled_font(3.5)
-    title_thickness = get_scaled_thickness(7)
-    
-    # Hitung posisi judul biar di tengah atas
-    title_size = cv2.getTextSize(title, title_font, title_font_scale, title_thickness)[0]
-    title_x = (width - title_size[0]) // 2
-    title_y = int(height * 0.22)
-    
-    # Gambar bayangan judul dulu (warna hitam, offset dikit)
-    shadow_offset = int(4 * min_scale)
-    cv2.putText(img, title, (title_x + shadow_offset, title_y + shadow_offset), 
-               title_font, title_font_scale, (0, 0, 0), title_thickness + 2)
-    
-    # Gambar judul asli di atas bayangan (warna cyan/kuning sesuai foto)
-    cv2.putText(img, title, (title_x, title_y), 
-               title_font, title_font_scale, (0, 255, 255), title_thickness)
-    
-    # Sisanya pakai font SIMPLEX yang lebih jelas
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    
-    # Gambar subtitle atau tagline
-    subtitle = "Kuis Matematika - Gambar Jawabanmu di Udara!"
-    subtitle_font_scale = get_scaled_font(0.9)
-    subtitle_thickness = get_scaled_thickness(3)
-    
-    subtitle_size = cv2.getTextSize(subtitle, font, subtitle_font_scale, subtitle_thickness)[0]
-    subtitle_x = (width - subtitle_size[0]) // 2
-    subtitle_y = int(height * 0.30)
-    
-    cv2.putText(img, subtitle, (subtitle_x, subtitle_y), 
-               font, subtitle_font_scale, (255, 255, 255), subtitle_thickness)
-    
-    # Bikin kotak instruksi dengan transparansi
-    box_width = int(width * 0.6)
-    box_height = int(height * 0.35)
-    box_x = (width - box_width) // 2
-    box_y = int(height * 0.38)
-    
-    # Gambar kotak dengan transparansi
-    box_overlay = img.copy()
-    cv2.rectangle(box_overlay, (box_x, box_y), 
-                 (box_x + box_width, box_y + box_height),
-                 (50, 50, 50), -1)
-    cv2.addWeighted(box_overlay, 0.7, img, 0.3, 0, img)
-    
-    # Gambar border kotak (warna kuning sesuai foto)
-    cv2.rectangle(img, (box_x, box_y), 
-                 (box_x + box_width, box_y + box_height),
-                 (0, 255, 255), 3)
-    
-    # Gambar judul instruksi
-    inst_font_scale = get_scaled_font(0.7)
-    inst_thickness = get_scaled_thickness(3)
-    
-    inst_title = "CARA BERMAIN:"
-    inst_title_size = cv2.getTextSize(inst_title, font, inst_font_scale + 0.1, inst_thickness + 1)[0]
-    inst_title_x = box_x + (box_width - inst_title_size[0]) // 2
-    inst_title_y = box_y + int(box_height * 0.15)
-    
-    cv2.putText(img, inst_title, (inst_title_x, inst_title_y),
-               font, inst_font_scale + 0.1, (0, 255, 255), inst_thickness + 1)
-    
-    # Daftar instruksi (sesuai foto)
-    instructions = [
-        ("assets/icons/one.png", "1 jari = Menggambar angka"),
-        ("assets/icons/two.png", "4 jari = Submit jawaban"),
-        ("assets/icons/five.png", "5 jari = Hapus gambar"),
-    ]
-    
-    text_x = box_x + int(box_width * 0.35)
-    start_y = inst_title_y + int(box_height * 0.2)
-    line_spacing = int(box_height * 0.18)
-    icon_size = int(40 * min_scale)
-    
-    for i, (icon_path, text) in enumerate(instructions):
-        y_pos = start_y + (i * line_spacing)
+    def __init__(self, draw_charge_time: int = 30, brush_size: int = 20):
+        """
+        Inisialisasi Gesture Controller.
         
-        # Coba load dan tampilkan icon gambar
-        icon_x = text_x - icon_size - int(15 * min_scale)
-        icon_y = y_pos - icon_size + int(5 * min_scale)
+        Args:
+            draw_charge_time (int): Frame yang diperlukan untuk aktivasi drawing
+            brush_size (int): Ukuran brush untuk menggambar
+        """
+        # Initialize hand detector
+        self.detector = HandDetector(
+            staticMode=False,
+            maxHands=1,
+            modelComplexity=1,
+            detectionCon=0.7,
+            minTrackCon=0.5
+        )
         
-        try:
-            if os.path.exists(icon_path):
-                icon = cv2.imread(icon_path, cv2.IMREAD_UNCHANGED)
-                if icon is not None:
-                    icon_resized = cv2.resize(icon, (icon_size, icon_size))
-                    
-                    # Handle transparansi icon (alpha channel)
-                    if icon_resized.shape[2] == 4:
-                        alpha = icon_resized[:, :, 3] / 255.0
-                        for c in range(3):
-                            img[icon_y:icon_y+icon_size, icon_x:icon_x+icon_size, c] = \
-                                alpha * icon_resized[:, :, c] + \
-                                (1 - alpha) * img[icon_y:icon_y+icon_size, icon_x:icon_x+icon_size, c]
-                    else:
-                        img[icon_y:icon_y+icon_size, icon_x:icon_x+icon_size] = icon_resized
-                else:
-                    # Fallback ke emoji kalau gambar gagal load
-                    emoji_icons = ["☝️", "✌️", "✋"]
-                    cv2.putText(img, emoji_icons[i], (icon_x, y_pos),
-                               font, inst_font_scale * 0.8, (255, 255, 255), inst_thickness)
-            else:
-                # Fallback ke emoji kalau file tidak ada
-                emoji_icons = ["☝️", "✌️", "✋"]
-                cv2.putText(img, emoji_icons[i], (icon_x, y_pos),
-                           font, inst_font_scale * 0.8, (255, 255, 255), inst_thickness)
-        except Exception as e:
-            # Fallback ke emoji kalau ada error
-            emoji_icons = ["☝️", "✌️", "✋"]
-            cv2.putText(img, emoji_icons[i], (icon_x, y_pos),
-                       font, inst_font_scale * 0.8, (255, 255, 255), inst_thickness)
+        # Gesture settings
+        self.draw_charge_time = draw_charge_time
+        self.brush_size = brush_size
         
-        # Gambar teks instruksi
-        cv2.putText(img, text, (text_x, y_pos),
-                   font, inst_font_scale, (255, 255, 255), inst_thickness)
-    
-    # Gambar call to action yang berkedip (hijau sesuai foto)
-    cta_text = "[ Tekan SPACE untuk Mulai! ]"
-    cta_font_scale = get_scaled_font(1.2)
-    cta_thickness = get_scaled_thickness(4)
-    
-    # Efek berkedip pakai sine wave
-    pulse = abs(math.sin(time.time() * 2)) * 0.3 + 0.7  # Range: 0.7 sampe 1.0
-    cta_color = (int(0 * pulse), int(255 * pulse), int(0 * pulse))  # Hijau
-    
-    cta_size = cv2.getTextSize(cta_text, font, cta_font_scale, cta_thickness)[0]
-    cta_x = (width - cta_size[0]) // 2
-    cta_y = int(height * 0.85)
-    
-    cv2.putText(img, cta_text, (cta_x, cta_y),
-               font, cta_font_scale, cta_color, cta_thickness)
-
-
-# GESTURE FUNCTIONS 
-
-def getHandInfo(img):
-    """
-    Mendapatkan informasi tangan dari frame.
-    
-    Returns:
-        tuple: (fingers, lmList) atau None jika tidak ada tangan terdeteksi
-    """
-    hands, img = detector.findHands(img, draw=True, flipType=True)
-    
-    if hands:
-        hand1 = hands[0]
-        lmList = hand1["lmList"]
-        fingers = detector.fingersUp(hand1)
-        return fingers, lmList
-    else:
-        return None
-
-
-def draw(info, previousPosition, canvas, img):
-    """
-    Menangani logika drawing berdasarkan gesture tangan.
-    
-    Args:
-        info: Tuple (fingers, lmlist)
-        previousPosition: Posisi sebelumnya untuk drawing
-        canvas: Canvas untuk menggambar
-        img: Frame gambar
+        # Drawing state
+        self.draw_charge_counter = 0
+        self.is_drawing_allowed = False
+        self.previous_position: Optional[Tuple[int, int]] = None
         
-    Returns:
-        tuple: (currentPosition, canvas)
-    """
-    global draw_charge_counter, is_drawing_allowed, notification_text, notification_timer
+        print("✓ Gesture Controller initialized")
     
-    fingers, lmlist = info
-    currentPosition = None
-    
-    # Mode Drawing: 1 jari (telunjuk)
-    if fingers == [0, 1, 0, 0, 0]:
-        currentPosition = lmlist[8][0:2]
+    def get_hand_info(self, img: np.ndarray) -> Optional[Tuple[list, list]]:
+        """
+        Mendeteksi tangan dan mengembalikan informasi jari dan landmark.
         
-        if not is_drawing_allowed:
-            draw_charge_counter += 1
-            if draw_charge_counter >= DRAW_CHARGE_TIME:
-                is_drawing_allowed = True
-                previousPosition = currentPosition
-        
-        if is_drawing_allowed:
-            if previousPosition is None:
-                previousPosition = currentPosition
+        Args:
+            img (numpy.ndarray): Frame gambar dari webcam
             
-            cv2.line(canvas, currentPosition, previousPosition, 
-                    (255, 255, 255), BRUSH_SIZE)
-            cv2.circle(canvas, currentPosition, 5, (255, 255, 255), cv2.FILLED)
-            
-            previousPosition = currentPosition
-    
-    # Mode Clear: 5 jari (tidak perlu tunggu notification timer)
-    elif fingers == [1, 1, 1, 1, 1]:
-        canvas = np.zeros_like(img)
-        if notification_timer == 0:
-            notification_text = "Hapus Canvas"
-            notification_timer = NOTIFICATION_DURATION
+        Returns:
+            tuple: (fingers, lmList) - Status jari dan list landmark
+            None: Jika tidak ada tangan yang terdeteksi
+        """
+        hands, img = self.detector.findHands(img, draw=True, flipType=True)
         
-        previousPosition = None
-        is_drawing_allowed = False
-        draw_charge_counter = 0
+        if hands:
+            hand1 = hands[0]
+            lm_list = hand1["lmList"]  # List of 21 landmarks
+            fingers = self.detector.fingersUp(hand1)  # Status jari (0=lipat, 1=tegak)
+            return fingers, lm_list
+        else:
+            return None
     
-    # Mode Submit dan Recognize: 4 jari (tanpa jempol)
-    elif fingers == [0, 1, 1, 1, 1]:
-        if notification_timer == 0:
-            if RECOGNIZER_LOADED:
-                result, confidence = recognize_multi_digit(session, canvas, max_digits=3)
+    def process_gesture(
+        self,
+        info: Tuple[list, list],
+        canvas: np.ndarray,
+        img: np.ndarray,
+        is_blocked: bool = False
+    ) -> Tuple[Optional[Tuple[int, int]], np.ndarray, Optional[str]]:
+        """
+        Memproses gesture dan menggambar di canvas.
+        
+        Gesture modes:
+        - [0,1,0,0,0]: Drawing mode (1 jari telunjuk)
+        - [1,1,1,1,1]: Clear canvas (5 jari)
+        - [0,1,1,1,1]: Submit answer (4 jari tanpa jempol)
+        
+        Args:
+            info (tuple): (fingers, lmList) dari get_hand_info()
+            canvas (numpy.ndarray): Canvas untuk menggambar
+            img (numpy.ndarray): Frame gambar dari webcam
+            is_blocked (bool): Flag untuk block gesture processing
+            
+        Returns:
+            tuple: (current_position, updated_canvas, action)
+                - current_position: Posisi finger saat ini atau None
+                - updated_canvas: Canvas yang sudah diupdate
+                - action: String action ("submit", "clear", None)
+        """
+        # Block gesture jika diminta
+        if is_blocked:
+            return self.previous_position, canvas, None
+        
+        fingers, lm_list = info
+        current_position = None
+        action = None
+        
+        # Mode menggambar: hanya jari telunjuk yang terangkat
+        if fingers == [0, 1, 0, 0, 0]:
+            current_position = tuple(lm_list[8][0:2])  # Posisi ujung jari telunjuk
+            
+            # Logika charging untuk aktivasi drawing
+            if not self.is_drawing_allowed:
+                self.draw_charge_counter += 1
+                if self.draw_charge_counter >= self.draw_charge_time:
+                    self.is_drawing_allowed = True
+                    self.previous_position = current_position
+            
+            # Mulai menggambar setelah charging selesai
+            if self.is_drawing_allowed:
+                if self.previous_position is None:
+                    self.previous_position = current_position
                 
-                if result is not None and confidence > 50:
-                    notification_text = f"ANGKA: {result}"
-                    cv2.imwrite("hasil_gambar.png", canvas)
-                    print(f"Hasil recognition: {result} (confidence: {confidence:.2f}%)")
-                else:
-                    notification_text = "TIDAK JELAS!"
-                    print("Digit tidak terdeteksi jelas")
-            else:
-                notification_text = "MODEL NOT LOADED!"
-            
-            notification_timer = NOTIFICATION_DURATION
+                # Gambar garis dari posisi sebelumnya ke posisi sekarang
+                cv2.line(canvas, current_position, self.previous_position, 
+                        (255, 255, 255), self.brush_size)
+                
+                # Gambar lingkaran kecil di posisi saat ini untuk smooth effect
+                cv2.circle(canvas, current_position, 5, (255, 255, 255), cv2.FILLED)
+                
+                self.previous_position = current_position
         
-        previousPosition = None
-        is_drawing_allowed = False
-        draw_charge_counter = 0
-    
-    # Mode Idle
-    else:
-        previousPosition = None
-        is_drawing_allowed = False
-        draw_charge_counter = 0
-    
-    return currentPosition, canvas
-
-
-# UI DISPLAY FUNCTIONS 
-
-def displayInstructions(img):
-    """
-    Menampilkan instruksi penggunaan di layar.
-    """
-    instructions = [
-        "INSTRUKSI:",
-        "1 Jari (telunjuk) = Draw",
-        "4 Jari (tanpa jempol) = Submit & Recognize",
-        "5 Jari = Clear Canvas",
-        "SPACE = Intro | Q = Quit"
-    ]
-    
-    y_offset = 30
-    font = cv2.FONT_HERSHEY_SIMPLEX
-    font_scale = get_scaled_font(0.5)
-    thickness = get_scaled_thickness(2)
-    
-    for i, text in enumerate(instructions):
-        cv2.putText(img, text, (10, y_offset + (i * 30)), 
-                   font, font_scale, (255, 255, 255), thickness)
-
-
-def displayReadyButton(img):
-    """
-    Menampilkan status ready/drawing button di pojok kanan atas.
-    """
-    global draw_charge_counter, is_drawing_allowed
-    
-    button_x = width - 150
-    button_y = 20
-    button_w = 130
-    button_h = 40
-    
-    if draw_charge_counter > 0 and not is_drawing_allowed:
-        progress = draw_charge_counter / DRAW_CHARGE_TIME
+        # Mode hapus: semua jari terangkat
+        elif fingers == [1, 1, 1, 1, 1]:
+            canvas = np.zeros_like(img)
+            action = "clear"
+            self._reset_drawing_state()
         
-        overlay = img.copy()
-        cv2.rectangle(overlay, (button_x, button_y), (button_x + button_w, button_y + button_h),
-                     (50, 50, 50), -1)
-        cv2.addWeighted(overlay, 0.7, img, 0.3, 0, img)
+        # Mode submit: 4 jari tanpa jempol
+        elif fingers == [0, 1, 1, 1, 1]:
+            action = "submit"
+            self._reset_drawing_state()
         
-        cv2.rectangle(img, (button_x, button_y), (button_x + button_w, button_y + button_h),
-                     (0, 255, 255), 2)
-        
-        fill_w = int(button_w * progress)
-        cv2.rectangle(img, (button_x, button_y), (button_x + fill_w, button_y + button_h),
-                     (0, 255, 0), -1)
-        
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = get_scaled_font(0.6)
-        thickness = get_scaled_thickness(2)
-        cv2.putText(img, "READY...", (button_x + 10, button_y + 28),
-                   font, font_scale, (255, 255, 255), thickness)
-    
-    elif is_drawing_allowed:
-        overlay = img.copy()
-        cv2.rectangle(overlay, (button_x, button_y), (button_x + button_w, button_y + button_h),
-                     (128, 0, 128), -1)
-        cv2.addWeighted(overlay, 0.7, img, 0.3, 0, img)
-        
-        cv2.rectangle(img, (button_x, button_y), (button_x + button_w, button_y + button_h),
-                     (255, 0, 255), 2)
-        
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = get_scaled_font(0.6)
-        thickness = get_scaled_thickness(2)
-        cv2.putText(img, "DRAWING", (button_x + 10, button_y + 28),
-                   font, font_scale, (255, 255, 255), thickness)
-
-
-def displayNotification(img):
-    """
-    Menampilkan notifikasi hasil recognition di pojok kanan bawah.
-    """
-    global notification_text, notification_timer
-    
-    if notification_timer > 0:
-        text_x = width - 300
-        text_y = height - 20
-        
-        if "ANGKA:" in notification_text:
-            color = (0, 255, 0)
-        elif "TIDAK JELAS" in notification_text or "NOT LOADED" in notification_text:
-            color = (0, 0, 255)
+        # Mode idle: reset drawing state
         else:
-            color = (0, 255, 255)
+            self._reset_drawing_state()
         
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = get_scaled_font(0.7)
-        thickness = get_scaled_thickness(2)
-        
-        cv2.putText(img, notification_text, (text_x, text_y), 
-                   font, font_scale, color, thickness)
-        notification_timer -= 1
-
-
-def displayFingerStatus(img, fingers):
-    """
-    Menampilkan status jari yang terdeteksi di pojok kiri bawah.
-    """
-    if fingers:
-        finger_text = f"Jari: {fingers}"
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = get_scaled_font(0.6)
-        thickness = get_scaled_thickness(2)
-        
-        cv2.putText(img, finger_text, (10, height - 20), 
-                   font, font_scale, (0, 255, 255), thickness)
-
-
-# ======================= UI MANAGER =======================
-class UIManager:
-    def __init__(self):
-        """Inisialisasi UI Manager"""
-        self.notification_text = ""
-        self.notification_timer = 0
-        self.notification_color = (255, 255, 255)
-        
-    def draw_left_panel(self, img, quiz_manager, gesture_state):
+        return current_position, canvas, action
+    
+    def _reset_drawing_state(self):
         """
-        Menggambar panel kiri dengan instruksi dan status
+        Reset drawing state ke kondisi awal.
+        
+        Internal method untuk cleanup state saat mode berubah.
         """
-        panel_width = DRAWING_AREA_X
-        
-        # Background panel kiri dengan transparansi
-        overlay = img.copy()
-        cv2.rectangle(overlay, (0, 0), (panel_width, WINDOW_HEIGHT),
-                     (40, 40, 40), -1)
-        cv2.addWeighted(overlay, 0.85, img, 0.15, 0, img)
-        
-        # Border panel
-        cv2.line(img, (panel_width, 0), (panel_width, WINDOW_HEIGHT),
-                (100, 100, 100), 2)
-        
-        y_offset = 30
-        
-        # Title
-        cv2.putText(img, "DO THE MATH!", (20, y_offset),
-                   cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 255, 255), 2)
-        y_offset += 50
-        
-        # Progress
-        progress_text = f"Soal: {quiz_manager.current_question}/{quiz_manager.total_questions}"
-        cv2.putText(img, progress_text, (20, y_offset),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        y_offset += 30
-        
-        score_text = f"Skor: {quiz_manager.score}"
-        cv2.putText(img, score_text, (20, y_offset),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        y_offset += 50
-        
-        # Instruksi
-        cv2.putText(img, "INSTRUKSI:", (20, y_offset),
-                   cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 255, 0), 2)
-        y_offset += 35
-        
-        instructions = [
-            "1 Jari",
-            "  (telunjuk)",
-            "  = Gambar jawaban",
-            "",
-            "4 Jari",
-            "  (tanpa jempol)",
-            "  = Submit jawaban",
-            "",
-            "5 Jari",
-            "  = Hapus canvas",
-            "",
-            "Tekan 'Q' = Quit",
-            "Tekan 'R' = Restart",
-            "Tekan 'N' = Next"
-        ]
-        
-        for instruction in instructions:
-            cv2.putText(img, instruction, (20, y_offset),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1)
-            y_offset += 25
-        
-        # Drawing status indicator
-        y_offset += 20
-        draw_status_indicator(img, gesture_state, 20, y_offset)
+        self.previous_position = None
+        self.is_drawing_allowed = False
+        self.draw_charge_counter = 0
     
-    def _draw_status_indicator(self, img, gesture_state, y_pos):
-        """Deprecated - using draw_status_indicator from gesture_tracking library"""
-        pass
-    
-    def draw_question_panel(self, img, quiz_manager):
+    def get_draw_progress(self) -> float:
         """
-        Menggambar panel soal di bagian atas kanan
+        Mendapatkan progress charging untuk drawing mode.
+        
+        Returns:
+            float: Progress 0.0 - 1.0
         """
-        question = quiz_manager.get_current_question()
-        
-        if question and question['image'] is not None:
-            question_img = question['image']
-            
-            # Resize soal agar tidak terlalu besar
-            max_width = 400
-            max_height = 150
-            
-            h, w = question_img.shape[:2]
-            scale = min(max_width / w, max_height / h)
-            new_w = int(w * scale)
-            new_h = int(h * scale)
-            
-            resized_question = cv2.resize(question_img, (new_w, new_h))
-            
-            # Posisi soal di kanan atas
-            x_pos = WINDOW_WIDTH - new_w - 20
-            y_pos = 20
-            
-            # Background untuk soal
-            overlay = img.copy()
-            padding = 10
-            cv2.rectangle(overlay,
-                         (x_pos - padding, y_pos - padding),
-                         (x_pos + new_w + padding, y_pos + new_h + padding),
-                         (255, 255, 255), -1)
-            cv2.addWeighted(overlay, 0.9, img, 0.1, 0, img)
-            
-            # Border
-            cv2.rectangle(img,
-                         (x_pos - padding, y_pos - padding),
-                         (x_pos + new_w + padding, y_pos + new_h + padding),
-                         (0, 255, 0), 3)
-            
-            # Paste soal
-            img[y_pos:y_pos+new_h, x_pos:x_pos+new_w] = resized_question
+        return min(1.0, self.draw_charge_counter / self.draw_charge_time)
     
-    def show_notification(self, text, color=(255, 255, 255), duration=NOTIFICATION_DURATION):
-        """Menampilkan notifikasi"""
-        self.notification_text = text
-        self.notification_color = color
-        self.notification_timer = duration
+    def is_ready_to_draw(self) -> bool:
+        """
+        Check apakah drawing mode sudah aktif.
+        
+        Returns:
+            bool: True jika sudah bisa menggambar
+        """
+        return self.is_drawing_allowed
     
-    def draw_notification(self, img):
-        """Menggambar notifikasi di layar"""
-        if self.notification_timer > 0:
-            # Posisi notifikasi di tengah bawah
-            text_size = cv2.getTextSize(self.notification_text,
-                                       cv2.FONT_HERSHEY_DUPLEX, 1.2, 3)[0]
-            
-            text_x = (WINDOW_WIDTH - text_size[0]) // 2
-            text_y = WINDOW_HEIGHT - 60
-            
-            # Background notifikasi
-            overlay = img.copy()
-            padding = 20
-            cv2.rectangle(overlay,
-                         (text_x - padding, text_y - text_size[1] - padding),
-                         (text_x + text_size[0] + padding, text_y + padding),
-                         (50, 50, 50), -1)
-            cv2.addWeighted(overlay, 0.8, img, 0.2, 0, img)
-            
-            # Border
-            cv2.rectangle(img,
-                         (text_x - padding, text_y - text_size[1] - padding),
-                         (text_x + text_size[0] + padding, text_y + padding),
-                         self.notification_color, 2)
-            
-            # Text
-            cv2.putText(img, self.notification_text, (text_x, text_y),
-                       cv2.FONT_HERSHEY_DUPLEX, 1.2, self.notification_color, 3)
-            
-            self.notification_timer -= 1
-    
-    def draw_quiz_complete(self, img, quiz_manager):
-        """Menggambar layar quiz selesai"""
-        overlay = img.copy()
-        cv2.rectangle(overlay, (0, 0), (WINDOW_WIDTH, WINDOW_HEIGHT),
-                     (0, 0, 0), -1)
-        cv2.addWeighted(overlay, 0.8, img, 0.2, 0, img)
+    def reset(self):
+        """
+        Reset semua state gesture controller.
         
-        # Title
-        cv2.putText(img, "QUIZ SELESAI!", (WINDOW_WIDTH//2 - 200, 200),
-                   cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 255, 0), 4)
-        
-        # Score
-        score_text = f"Skor Akhir: {quiz_manager.score}/{quiz_manager.total_questions}"
-        cv2.putText(img, score_text, (WINDOW_WIDTH//2 - 200, 300),
-                   cv2.FONT_HERSHEY_DUPLEX, 1.2, (255, 255, 255), 3)
-        
-        # Percentage
-        percentage = (quiz_manager.score / quiz_manager.total_questions) * 100
-        percentage_text = f"Persentase: {percentage:.1f}%"
-        cv2.putText(img, percentage_text, (WINDOW_WIDTH//2 - 180, 370),
-                   cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-        
-        # Instruction
-        cv2.putText(img, "Tekan 'R' untuk restart", (WINDOW_WIDTH//2 - 180, 450),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
-        cv2.putText(img, "Tekan 'Q' untuk keluar", (WINDOW_WIDTH//2 - 180, 500),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+        Digunakan saat restart quiz atau clear semua state.
+        """
+        self._reset_drawing_state()
+        print("✓ Gesture controller reset")
 
 
-# MAIN LOOP 
-
-print("DO THE MATH - Digit Recognition dengan Gesture")
-print("Tekan SPACE untuk toggle intro screen")
-print("Tekan Q untuk keluar")
-
-def play_intro_audio():
-    """Helper function untuk play audio intro"""
-    global audio_played
-    if audio_loaded and not audio_played:
-        try:
-            pygame.mixer.music.play()
-            audio_played = True
-            print("Playing intro audio...")
-        except Exception as e:
-            print(f"Error playing audio: {e}")
-
-def toggle_intro_mode():
-    """Helper function untuk toggle intro screen"""
-    global show_intro, audio_played
-    show_intro = not show_intro
-    if show_intro:
-        print("Menampilkan intro screen...")
-        # Reset flag audio untuk diplay lagi
-        audio_played = False
-    else:
-        print("Kembali ke mode drawing...")
-        # Stop audio kalau lagi main
-        if audio_loaded:
-            pygame.mixer.music.stop()
-
-while True:
-    success, img = cap.read()
+# Test function
+if __name__ == "__main__":
+    print("Testing Gesture Controller Module...")
+    print("-" * 60)
     
-    if not success:
-        print("Gagal membaca dari kamera!")
-        break
-    
-    img = cv2.flip(img, 1)
-    
-    if canvas is None:
-        canvas = np.zeros_like(img)
-    
-    # Cek apakah sedang di intro screen
-    if show_intro:
-        # Play audio intro (hanya sekali)
-        play_intro_audio()
+    try:
+        # Initialize controller
+        controller = GestureController(draw_charge_time=30, brush_size=20)
         
-        # Tampilkan intro screen
-        draw_attract_mode(img)
-        cv2.imshow("DO THE MATH", img)
-    else:
-        # Mode normal (drawing)
-        info = getHandInfo(img)
-        fingers = None
+        print("\n✓ Gesture Controller initialized successfully")
+        print(f"  - Draw charge time: {controller.draw_charge_time} frames")
+        print(f"  - Brush size: {controller.brush_size} pixels")
+        print(f"  - Drawing allowed: {controller.is_drawing_allowed}")
         
-        if info:
-            fingers, lmlist = info
-            previousPosition, canvas = draw(info, previousPosition, canvas, img)
-            displayFingerStatus(img, fingers)
-        else:
-            previousPosition = None
-            is_drawing_allowed = False
-            draw_charge_counter = 0
+        # Test reset
+        controller.reset()
+        print("\n✓ Reset function works")
         
-        combinedImage = cv2.addWeighted(img, 0.7, canvas, 0.3, 0)
+        print("\n" + "="*60)
+        print("✓ Gesture Controller Module Test: PASSED")
+        print("="*60)
         
-        displayInstructions(combinedImage)
-        
-        if fingers is not None:
-            displayReadyButton(combinedImage)
-        
-        displayNotification(combinedImage)
-        
-        cv2.imshow("DO THE MATH", combinedImage)
-    
-    # Keyboard controls
-    key = cv2.waitKey(1) & 0xFF
-    
-    if key == ord('q'):
-        print("Keluar dari program...")
-        break
-    elif key == ord(' '):
-        # Toggle intro screen
-        toggle_intro_mode()
-
-cap.release()
-cv2.destroyAllWindows()
-pygame.mixer.quit()
-print("Program selesai!")
+    except Exception as e:
+        print(f"\n✗ Test FAILED: {str(e)}")
+        import traceback
+        traceback.print_exc()
