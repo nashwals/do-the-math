@@ -1,0 +1,117 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[bahasa]{babel}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+% Margin setting
+\geometry{left=3cm, right=3cm, top=3cm, bottom=3cm}
+
+% Code listing style
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{pythonstyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2,
+    language=Python
+}
+\lstset{style=pythonstyle}
+
+% Hyperlink setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    urlcolor=blue,
+}
+
+\begin{document}
+
+% ========== COVER PAGE ==========
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    
+
+    {\LARGE\bfseries LAPORAN TUGAS BESAR\par}
+    {\large Sistem/Teknologi Multimedia (IF25-40305)\par}
+    \vspace{0.5cm}
+    {\large Filter Kuis Matematika Interaktif dengan\par}
+    {\large Hand Gesture Recognition (Do The Math!)\par}
+    
+    \vspace{1cm}
+    
+    % Logo ITERA
+    \includegraphics[width=6cm]{gambar/Logo_ITERA.png}\\[1cm]
+    \vfill
+
+    {\large
+    \textbf{Disusun oleh:}\par
+    \vspace{0.5cm}
+    \begin{tabular}{ll}
+        Tawakkal Rabbani Muhammad & (122140029)\\
+        Naufal Harris Nurkhoirulloh & (122140040)\\
+        Nashwa Putri Laisya & (122140180)\\
+    \end{tabular}
+    \par}
+    
+    \vfill
+    
+    \vspace{2cm}
+    {\large
+    \textbf{PROGRAM STUDI TEKNIK INFORMATIKA}\\
+    \textbf{INSTITUT TEKNOLOGI SUMATERA}\\
+    \textbf{2025}
+    \par}
+    
+\end{titlepage}
+
+% ========== TABLE OF CONTENTS ==========
+\tableofcontents
+\newpage
+
+% ========== BAB 1 ==========
+\input{bab/bab1}
+
+% ========== BAB 2 ==========
+\input{bab/bab2}
+
+% ========== BAB 3 ==========
+\input{bab/bab3}
+
+% ========== BAB 4 ==========
+\input{bab/bab4}
+
+% ========== BAB 5 ==========
+\input{bab/bab5}
+
+% ========== LAMPIRAN ==========
+\input{lampiran}
+
+% ========== REFERENCES ==========
+\begin{thebibliography}{99}
+\bibitem{ref1} 
+% Isi referensi di sini
+
+\end{thebibliography}
+
+\end{document}
