@@ -1,19 +1,28 @@
-# Requirements untuk Project DO THE MATH! (ONNX Version + Audio)
-# Instalasi: uv pip install -r requirements.txt
+# ================================================================
+# DO THE MATH! - Interactive Math Learning with Gesture Recognition
+# ================================================================
+# Project: Tugas Besar Sistem Teknologi Multimedia (IF25-40305)
+# Team: Tawakkal, Nashwa, Naufal
+# 
+# Installation:
+#   pip install -r requirements.txt
+#   or
+#   uv pip install -r requirements.txt
+# ================================================================
 
-# Computer Vision & Hand Tracking
-opencv-python==4.8.1.78
-cvzone==1.6.1
-mediapipe==0.10.8
+# -------------------- Computer Vision & Hand Tracking --------------------
+opencv-python==4.8.1            # Core computer vision library
+cvzone==1.6.1                   # Simplified OpenCV utilities
+mediapipe==0.10.14              # Google's hand tracking solution
 
-# ONNX Runtime untuk Digit Recognition (LEBIH RINGAN dari TensorFlow)
-onnxruntime==1.16.3
+# -------------------- Machine Learning & AI --------------------
+onnxruntime==1.17.0            # ONNX model inference (lightweight alternative to TensorFlow)
 
-# Audio Playback
-pygame==2.5.2
+# -------------------- Audio Processing --------------------
+pygame==2.5.2                  # Audio playback and mixing
 
-# Numerical Computing
-numpy==1.24.3
+# -------------------- Numerical Computing --------------------
+numpy==1.26.0                  # Fundamental package for scientific computing
 
-# Visualization (untuk debug mode - opsional)
-matplotlib==3.7.2
+# -------------------- Visualization (Optional) --------------------
+matplotlib==3.8.0              # Plotting library for debugging and analysis
