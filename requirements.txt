@@ -11,7 +11,7 @@
 # ================================================================
 
 # -------------------- Computer Vision & Hand Tracking --------------------
-opencv-python==4.8.1            # Core computer vision library
+opencv-python==4.8.1.78          # Core computer vision library
 cvzone==1.6.1                   # Simplified OpenCV utilities
 mediapipe==0.10.14              # Google's hand tracking solution
 

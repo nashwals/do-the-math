@@ -69,32 +69,38 @@ cd do-the-math
 
 ---
 
-### 🔧 Step 2: Setup Virtual Environment (Recommended)
+### 🔧 Step 2: Setup Virtual Environment dengan UV
 
 #### **Windows:**
 
 ```powershell
-# Buat virtual environment
-python -m venv venv
+# Install UV (jika belum terinstall)
+pip install uv
+
+# Buat virtual environment dengan UV
+uv venv
 
 # Aktivasi virtual environment
-.\venv\Scripts\activate
+.venv\Scripts\activate
 
-# (Optional) Upgrade pip
-python -m pip install --upgrade pip
+# Verifikasi UV environment aktif
+uv pip list
 ```
 
 #### **Mac/Linux:**
 
 ```bash
-# Buat virtual environment
-python3 -m venv venv
+# Install UV (jika belum terinstall)
+pip install uv
+
+# Buat virtual environment dengan UV
+uv venv
 
 # Aktivasi virtual environment
-source venv/bin/activate
+source .venv/bin/activate
 
-# (Optional) Upgrade pip
-pip install --upgrade pip
+# Verifikasi UV environment aktif
+uv pip list
 ```
 
 ---
@@ -105,14 +111,14 @@ pip install --upgrade pip
 
 ```powershell
 # Install semua dependencies dari requirements.txt
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 #### **Mac/Linux:**
 
 ```bash
 # Install semua dependencies dari requirements.txt
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 ---
@@ -220,26 +226,37 @@ do-the-math/
 # Weekly Logbook
 
 ## Week - 1
+
 #### 28 Oktober 2025
+
 - Diskusi dan pemilihan ide topik Tugas Besar yang akan dikerjakan
 
 ## Week - 2
+
 #### 7 November 2025
+
 - Membuat dataset audio soal matematika
 - Membuat dataset gambar soal matematika
 
 ## Week - 3
+
 #### 10 - 12 November 2025
+
 - Membuat program untuk hand gesture tracking
 - Membuat program untuk menggambar di canvas/udara
 
 ## Week - 4
+
 #### 18 - 20 November 2025
+
 - Membuat program digit recognizer untuk inferensi mnist onnx
 
 ## Week - 5
+
 #### 24 - 28 November 2025
+
 - Membuat program tampilan quiz
 
 #### 29 - 30 November 2025
+
 - Fiksasi program secara keseluruhan
