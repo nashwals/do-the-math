@@ -1,14 +1,63 @@
 \section{Pendahuluan}
 \subsection{Latar Belakang}
-% Isi latar belakang di sini
+Perkembangan teknologi multimedia dalam beberapa tahun terakhir telah membawa transformasi signifikan dalam berbagai aspek kehidupan, termasuk dalam bidang pendidikan~\cite{nautica2022ta}. Teknologi seperti \textit{computer vision}, \textit{gesture recognition}, dan pemrosesan audio telah memungkinkan terciptanya metode pembelajaran yang lebih interaktif dan menarik, khususnya untuk anak-anak dan remaja.
+
+Matematika merupakan salah satu mata pelajaran fundamental yang seringkali dianggap sulit dan membosankan oleh sebagian besar siswa~\cite{kholil2020faktor}. Metode pembelajaran konvensional yang cenderung monoton dan kurang interaktif menjadi salah satu faktor yang menyebabkan rendahnya minat belajar matematika~\cite{primrose2024analisis}. Oleh karena itu, diperlukan pendekatan baru yang lebih menarik dan menyenangkan untuk meningkatkan motivasi belajar siswa.
+
+Di sisi lain, popularitas aplikasi media sosial seperti TikTok dan Instagram telah menunjukkan bahwa konten interaktif berbasis filter dan \textit{augmented reality} sangat diminati oleh kalangan muda~\cite{yusup2023literature}. Filter-filter interaktif yang menggunakan teknologi \textit{hand tracking} dan \textit{gesture recognition} terbukti mampu menarik perhatian pengguna dan meningkatkan \textit{engagement} mereka terhadap konten digital.
+
+"DO THE MATH!" hadir sebagai solusi pembelajaran matematika yang menggabungkan teknologi multimedia dengan konsep gamifikasi. Sistem kuis matematika yang interaktif ini memanfaatkan \textit{computer vision}, \textit{hand gesture recognition}, dan \textit{digit recognition} berbasis \textit{artificial intelligence} untuk menciptakan pengalaman belajar matematika yang lebih menyenangkan dan engaging.
+
+Dengan memanfaatkan teknologi \textit{MediaPipe} untuk \textit{hand tracking}, model ONNX MNIST untuk \textit{digit recognition}, dan sistem audio interaktif, tugas besar ini menghadirkan cara baru dalam menjawab soal matematika yaitu dengan menggambar angka di udara menggunakan jari. Pendekatan ini tidak hanya membuat pembelajaran lebih menarik, tetapi juga melatih koordinasi motorik dan kreativitas siswa.
+
 
 \subsection{Rumusan Masalah}
-% Isi rumusan masalah di sini
+
+Berdasarkan latar belakang yang telah diuraikan, beberapa rumusan masalah yang akan dijawab dalam tugas besar ini adalah:
+
+\begin{enumerate}
+    \item Bagaimana mengimplementasikan \textit{hand gesture tracking} untuk mendeteksi gesture tangan secara real-time menggunakan webcam?
+    
+    \item Bagaimana mengimplementasikan \textit{digit recognition} yang mampu mengenali angka tulisan tangan yang digambar di udara?
+    
+    \item Bagaimana mengintegrasikan \textit{hand gesture tracking}, \textit{digit recognition}, dan \textit{audio processing} untuk menciptakan sistem kuis matematika yang interaktif?  
+  \end{enumerate}
+
 
 \subsection{Tujuan}
-% Isi tujuan di sini
+
+Berdasarkan rumusan masalah yang telah dipaparkan, tujuan dari pengembangan tugas besar ini adalah:
+
+\begin{enumerate}
+    \item Mengimplementasikan \textit{hand gesture tracking} untuk mendeteksi pergerakan tangan pengguna secara real-time melalui input webcam.
+    
+    \item Mengembangkan sistem \textit{digit recognition} yang mampu mengenali angka tulisan tangan yang digambar di udara.
+    
+    \item Mengintegrasikan \textit{hand gesture tracking, digit recognition,} dan \textit{audio/visual feedback} menjadi sebuah sistem kuis matematika interaktif.
+\end{enumerate}
+
 
 \subsection{Ruang Lingkup}
-% Isi ruang lingkup di sini
+
+Untuk memfokuskan pembahasan dan pengembangan tugas besar, ruang lingkup yang ditentukan adalah sebagai berikut:
+
+\begin{enumerate}
+    \item \textbf{Fitur Sistem}
+    \begin{itemize}
+        \item Deteksi tangan menggunakan MediaPipe dengan maksimal 1 tangan
+        \item Gesture recognition untuk 3 jenis gesture: 1 jari (menggambar), 4 jari (submit), dan 5 jari (hapus canvas)
+        \item Digit recognition untuk angka 0-9 menggunakan model MNIST ONNX
+        \item Quiz matematika dengan 15 soal operasi aritmatika dasar dengan jawaban angka satu digit.
+        \item Audio playback untuk soal dan sound effects
+        \item Confetti particle system untuk feedback visual
+    \end{itemize}
+    
+    \item \textbf{Batasan Sistem}
+    \begin{itemize}
+        \item Aplikasi memerlukan pencahayaan yang cukup untuk deteksi tangan
+        \item Background sebaiknya tidak terlalu ramai untuk akurasi hand tracking yang optimal
+        \item Memerlukan webcam untuk input video real-time
+    \end{itemize}
+\end{enumerate}
 
 \newpage

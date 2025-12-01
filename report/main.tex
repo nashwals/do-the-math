@@ -5,7 +5,13 @@
 \usepackage{graphicx}
 \usepackage{listings}
 \usepackage{xcolor}
-\usepackage{hyperref}
+\usepackage[
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=blue
+]{hyperref}
+
 
 % Margin setting
 \geometry{left=3cm, right=3cm, top=3cm, bottom=3cm}
@@ -56,7 +62,7 @@
     {\large Sistem/Teknologi Multimedia (IF25-40305)\par}
     \vspace{0.5cm}
     {\large Filter Kuis Matematika Interaktif dengan\par}
-    {\large Hand Gesture Recognition (Do The Math!)\par}
+    {\large Hand Gesture Recognition (DO THE MATH!)\par}
     
     \vspace{1cm}
     
@@ -107,11 +113,9 @@
 % ========== LAMPIRAN ==========
 \input{lampiran}
 
-% ========== REFERENCES ==========
-\begin{thebibliography}{99}
-\bibitem{ref1} 
-% Isi referensi di sini
 
-\end{thebibliography}
+% ========== REFERENCES ========== 
+\bibliographystyle{IEEEtran}
+\bibliography{references}
 
 \end{document}
