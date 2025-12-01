@@ -1,22 +1,31 @@
 \section{Alat dan Bahan}
-\subsection{Bahasa Pemrograman dan Lingkungan Pengembangan}
-% Isi penjelasan bahasa pemrograman (Python) di sini
 
+Proyek tugas besar ini dikembangkan sepenuhnya dalam lingkungan perangkat lunak dengan memanfaatkan bahasa pemrograman Python serta beberapa pustaka pendukung untuk pemrosesan video, \textit{computer vision}, \textit{gesture recognition}, pengenalan angka, dan \textit{audio playback}. Berikut adalah alat dan bahan yang digunakan:
+
+\subsection{Bahasa Pemrograman dan Lingkungan Pengembangan}
+
+\begin{enumerate}
+    \item Python 3.9+, digunakan sebagai bahasa pemrograman utama karena mendukung pustaka \textit{computer vision} dan pemrosesan multimedia secara luas.
+    \item Visual Studio Code / Terminal, digunakan sebagai editor dan lingkungan pengembangan lokal.
+\end{enumerate}
 
 \subsection{Library dan Pustaka yang Digunakan}
-% Isi library yang digunakan:
-% - opencv-python
-% - mediapipe
-% - onnxruntime
-% - numpy
-% - cvzone
-% - pygame
 
+\begin{enumerate}
+    \item opencv-python 4.8.1.78, digunakan untuk pemrosesan video dan citra secara real-time dari webcam.
+    \item mediapipe 0.10.14, digunakan untuk deteksi landmark tangan dan \textit{hand tracking} secara real-time.
+    \item cvzone 1.6.1, digunakan untuk utilitas OpenCV yang disederhanakan dalam pemrosesan citra.
+    \item onnxruntime 1.17.0, digunakan untuk \textit{inference} model MNIST dalam format ONNX.
+    \item pygame 2.5.2, digunakan untuk \textit{audio playback} dan pemutaran \textit{sound effects}.
+    \item numpy 1.26.0, digunakan untuk manipulasi array numerik dan perhitungan matematis.
+    \item matplotlib 3.8.0, digunakan untuk visualisasi dan \textit{debugging} (opsional).
+\end{enumerate}
 
 \subsection{Metode dan Algoritma}
-% Isi penjelasan metode:
-% - Estimasi Heart Rate (HR)
-% - Estimasi Respiration Rate (RR)
-% - Transformasi Fourier (FFT)
 
-\newpage
+\begin{enumerate}
+    \item \textit{Hand Tracking}, dilakukan dengan mendeteksi landmark tangan menggunakan MediaPipe untuk mengenali posisi jari secara real-time.
+    \item \textit{Gesture Recognition}, dilakukan dengan menganalisis jumlah jari yang terdeteksi untuk membedakan gesture menggambar (1 jari), submit (4 jari), dan hapus (5 jari).
+    \item \textit{Digit Recognition}, dilakukan dengan memproses gambar digit dari canvas menggunakan teknik \textit{preprocessing} citra (denoising, thresholding, morphological operations) dan model MNIST ONNX untuk klasifikasi angka 0-9.
+    \item \textit{Multi-Digit Detection}, dilakukan dengan mencari \textit{bounding boxes} dari setiap digit terpisah pada canvas menggunakan \textit{contour detection} dan mengurutkannya dari kiri ke kanan.
+\end{enumerate}
