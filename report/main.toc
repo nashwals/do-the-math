@@ -2,37 +2,37 @@
 \contentsline {section}{\numberline {1}Pendahuluan}{2}{section.1}%
 \contentsline {subsection}{\numberline {1.1}Latar Belakang}{2}{subsection.1.1}%
 \contentsline {subsection}{\numberline {1.2}Rumusan Masalah}{2}{subsection.1.2}%
-\contentsline {subsection}{\numberline {1.3}Tujuan}{2}{subsection.1.3}%
-\contentsline {subsection}{\numberline {1.4}Ruang Lingkup}{2}{subsection.1.4}%
-\contentsline {section}{\numberline {2}Alat dan Bahan}{3}{section.2}%
-\contentsline {subsection}{\numberline {2.1}Bahasa Pemrograman dan Lingkungan Pengembangan}{3}{subsection.2.1}%
-\contentsline {subsection}{\numberline {2.2}Library dan Pustaka yang Digunakan}{3}{subsection.2.2}%
-\contentsline {subsection}{\numberline {2.3}Metode dan Algoritma}{3}{subsection.2.3}%
-\contentsline {section}{\numberline {3}Penjelasan}{4}{section.3}%
-\contentsline {subsection}{\numberline {3.1}Struktur Folder Proyek}{4}{subsection.3.1}%
-\contentsline {subsection}{\numberline {3.2}Instalasi Library}{4}{subsection.3.2}%
-\contentsline {subsection}{\numberline {3.3}Modul main.py}{4}{subsection.3.3}%
-\contentsline {subsubsection}{\numberline {3.3.1}Import library pada main.py}{4}{subsubsection.3.3.1}%
-\contentsline {subsubsection}{\numberline {3.3.2}Memeriksa Dependensi}{4}{subsubsection.3.3.2}%
-\contentsline {subsection}{\numberline {3.4}Modul signal\_processing.py}{4}{subsection.3.4}%
-\contentsline {subsection}{\numberline {3.5}Modul gui.py}{4}{subsection.3.5}%
-\contentsline {section}{\numberline {4}Hasil}{5}{section.4}%
-\contentsline {subsection}{\numberline {4.1}Hasil Implementasi}{5}{subsection.4.1}%
-\contentsline {subsection}{\numberline {4.2}Analisis Hasil}{5}{subsection.4.2}%
-\contentsline {section}{\numberline {5}Kesimpulan}{6}{section.5}%
-\contentsline {section}{\numberline {6}Lampiran}{7}{section.6}%
-\contentsline {subsection}{\numberline {6.1}Lampiran A: Dokumentasi Github}{7}{subsection.6.1}%
-\contentsline {subsubsection}{\numberline {6.1.1}Link Repository}{7}{subsubsection.6.1.1}%
-\contentsline {subsubsection}{\numberline {6.1.2}Dokumentasi Commit dan Kontribusi}{7}{subsubsection.6.1.2}%
-\contentsline {subsection}{\numberline {6.2}Lampiran B: Penggunaan AI dalam Proyek}{7}{subsection.6.2}%
-\contentsline {subsubsection}{\numberline {6.2.1}AI Tools yang Digunakan}{7}{subsubsection.6.2.1}%
-\contentsline {subsubsection}{\numberline {6.2.2}Link Dokumentasi Penggunaan AI}{7}{subsubsection.6.2.2}%
-\contentsline {subsubsection}{\numberline {6.2.3}Screenshot Penggunaan AI}{7}{subsubsection.6.2.3}%
-\contentsline {subsection}{\numberline {6.3}Lampiran C: Kode Program Lengkap}{7}{subsection.6.3}%
-\contentsline {subsubsection}{\numberline {6.3.1}File main.py}{7}{subsubsection.6.3.1}%
-\contentsline {subsubsection}{\numberline {6.3.2}File digit\_recognition.py}{7}{subsubsection.6.3.2}%
-\contentsline {subsubsection}{\numberline {6.3.3}File gesture\_tracking.py}{7}{subsubsection.6.3.3}%
-\contentsline {subsection}{\numberline {6.4}Lampiran D: Screenshot Tambahan}{7}{subsection.6.4}%
-\contentsline {subsubsection}{\numberline {6.4.1}Screenshot Proses Development}{7}{subsubsection.6.4.1}%
-\contentsline {subsubsection}{\numberline {6.4.2}Screenshot Testing}{7}{subsubsection.6.4.2}%
-\contentsline {subsubsection}{\numberline {6.4.3}Screenshot Error dan Debugging}{7}{subsubsection.6.4.3}%
+\contentsline {subsection}{\numberline {1.3}Tujuan}{3}{subsection.1.3}%
+\contentsline {subsection}{\numberline {1.4}Ruang Lingkup}{3}{subsection.1.4}%
+\contentsline {section}{\numberline {2}Alat dan Bahan}{4}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Bahasa Pemrograman dan Lingkungan Pengembangan}{4}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Library dan Pustaka yang Digunakan}{4}{subsection.2.2}%
+\contentsline {subsection}{\numberline {2.3}Metode dan Algoritma}{4}{subsection.2.3}%
+\contentsline {section}{\numberline {3}Penjelasan}{5}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Struktur Folder Proyek}{5}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Instalasi Library}{5}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Modul main.py}{5}{subsection.3.3}%
+\contentsline {subsubsection}{\numberline {3.3.1}Import library pada main.py}{5}{subsubsection.3.3.1}%
+\contentsline {subsubsection}{\numberline {3.3.2}Memeriksa Dependensi}{5}{subsubsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.4}Modul signal\_processing.py}{5}{subsection.3.4}%
+\contentsline {subsection}{\numberline {3.5}Modul gui.py}{5}{subsection.3.5}%
+\contentsline {section}{\numberline {4}Hasil}{6}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Hasil Implementasi}{6}{subsection.4.1}%
+\contentsline {subsection}{\numberline {4.2}Analisis Hasil}{6}{subsection.4.2}%
+\contentsline {section}{\numberline {5}Kesimpulan}{7}{section.5}%
+\contentsline {section}{\numberline {6}Lampiran}{8}{section.6}%
+\contentsline {subsection}{\numberline {6.1}Lampiran A: Dokumentasi Github}{8}{subsection.6.1}%
+\contentsline {subsubsection}{\numberline {6.1.1}Link Repository}{8}{subsubsection.6.1.1}%
+\contentsline {subsubsection}{\numberline {6.1.2}Dokumentasi Commit dan Kontribusi}{8}{subsubsection.6.1.2}%
+\contentsline {subsection}{\numberline {6.2}Lampiran B: Penggunaan AI dalam Proyek}{8}{subsection.6.2}%
+\contentsline {subsubsection}{\numberline {6.2.1}AI Tools yang Digunakan}{8}{subsubsection.6.2.1}%
+\contentsline {subsubsection}{\numberline {6.2.2}Link Dokumentasi Penggunaan AI}{8}{subsubsection.6.2.2}%
+\contentsline {subsubsection}{\numberline {6.2.3}Screenshot Penggunaan AI}{8}{subsubsection.6.2.3}%
+\contentsline {subsection}{\numberline {6.3}Lampiran C: Kode Program Lengkap}{8}{subsection.6.3}%
+\contentsline {subsubsection}{\numberline {6.3.1}File main.py}{8}{subsubsection.6.3.1}%
+\contentsline {subsubsection}{\numberline {6.3.2}File digit\_recognition.py}{8}{subsubsection.6.3.2}%
+\contentsline {subsubsection}{\numberline {6.3.3}File gesture\_tracking.py}{8}{subsubsection.6.3.3}%
+\contentsline {subsection}{\numberline {6.4}Lampiran D: Screenshot Tambahan}{8}{subsection.6.4}%
+\contentsline {subsubsection}{\numberline {6.4.1}Screenshot Proses Development}{8}{subsubsection.6.4.1}%
+\contentsline {subsubsection}{\numberline {6.4.2}Screenshot Testing}{8}{subsubsection.6.4.2}%
+\contentsline {subsubsection}{\numberline {6.4.3}Screenshot Error dan Debugging}{8}{subsubsection.6.4.3}%
