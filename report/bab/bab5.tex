@@ -1,4 +1,37 @@
-\section{Kesimpulan}
-% Isi kesimpulan dari laporan ini
+\section{Kesimpulan dan Saran}
+
+\subsection{Kesimpulan}
+Berdasarkan proses perancangan, implementasi, hingga pengujian yang telah dilakukan pada aplikasi \textit{DO THE MATH!}, dapat ditarik beberapa kesimpulan sebagai berikut:
+
+\begin{enumerate}
+    \item \textbf{Integrasi Sistem Berhasil Dilakukan:}
+    Aplikasi berhasil menggabungkan teknologi \textit{Computer Vision} (MediaPipe) dan kecerdasan buatan (ONNX Runtime) menjadi satu kesatuan sistem yang utuh. Sistem mampu berjalan secara \textit{real-time} melalui \textit{webcam} untuk mendeteksi gerakan tangan sekaligus mengenali tulisan angka di udara tanpa kendala integrasi yang berarti.
+
+    \item \textbf{Efektivitas Interaksi Gesture:}
+    Implementasi logika \textit{gesture control} dengan mekanisme \textit{charging time} (waktu tunggu) terbukti efektif dalam meningkatkan pengalaman pengguna. Fitur ini berhasil meminimalisir terjadinya coretan garis yang tidak disengaja saat pengguna baru mengangkat tangan, sehingga proses menggambar menjadi lebih terkontrol dan natural.
+
+    \item \textbf{Kemampuan Pengenalan Angka:}
+    Modul \textit{Digit Recognition} yang dilengkapi dengan tahapan \textit{preprocessing} citra (seperti \textit{thresholding} dan operasi morfologi) mampu mengenali input angka tulisan tangan dengan cukup baik. Algoritma pengurutan kontur (\textit{contour sorting}) juga berhasil diterapkan untuk menangani jawaban yang terdiri dari dua digit (multi-digit), sehingga sistem tidak terbatas pada jawaban satuan saja.
+
+    \item \textbf{Ketergantungan pada Lingkungan:}
+    Meskipun sistem berfungsi dengan baik secara logika, performanya di dunia nyata masih sangat dipengaruhi oleh faktor eksternal, terutama pencahayaan. Kondisi minim cahaya dapat menyebabkan \textit{jitter} (getaran) pada deteksi jari, yang berdampak pada kerapian garis tulisan di kanvas virtual.
+\end{enumerate}
+
+\subsection{Saran}
+Pengembangan aplikasi ini masih memiliki ruang untuk perbaikan dan penyempurnaan di masa mendatang. Berikut adalah beberapa saran yang dapat dipertimbangkan untuk pengembangan selanjutnya:
+
+\begin{enumerate}
+    \item \textbf{Peningkatan Akurasi Model:}
+    Disarankan untuk melatih ulang model atau menggunakan dataset yang lebih variatif (termasuk variasi tulisan tangan yang miring atau tidak standar) guna mengurangi kesalahan prediksi pada angka yang memiliki bentuk mirip, seperti angka 4 dan 9.
+
+    \item \textbf{Penanganan Kondisi Pencahayaan:}
+    Untuk mengatasi masalah \textit{jitter} pada kondisi kurang cahaya, dapat ditambahkan algoritma \textit{stabilizer} atau filter tambahan (seperti Kalman Filter) pada koordinat jari agar garis yang dihasilkan tetap halus meskipun input kamera sedikit bergetar.
+
+    \item \textbf{Variasi Soal Matematika:}
+    Saat ini sistem berfokus pada operasi penjumlahan sederhana. Kedepannya, bank soal dapat diperluas untuk mencakup operasi pengurangan, perkalian, dan pembagian, serta penyesuaian tingkat kesulitan dinamis berdasarkan skor pengguna.
+
+    \item \textbf{Optimasi untuk Spesifikasi Rendah:}
+    Meskipun sudah cukup ringan, optimasi kode lebih lanjut dapat dilakukan agar aplikasi dapat berjalan lebih lancar pada perangkat dengan spesifikasi perangkat keras yang sangat terbatas.
+\end{enumerate}
 
 \newpage

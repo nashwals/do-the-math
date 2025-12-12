@@ -1,27 +1,107 @@
-\section{Penjelasan}
-\subsection{Struktur Folder Proyek}
-% Isi penjelasan struktur folder
+\section{Penjelasan Sistem}
 
+Bab ini menjabarkan struktur teknis dari perangkat lunak \textit{DO THE MATH!}. Pembahasan mencakup organisasi direktori proyek, prosedur instalasi dependensi, serta analisis mendalam mengenai logika pemrograman pada setiap modul utama, termasuk kelas dan fungsi yang membangun sistem interaksi \textit{gesture}, pengenalan angka, dan manajemen kuis.
+
+\subsection{Struktur Folder Proyek}
+Struktur folder dalam proyek ini menerapkan prinsip \textbf{modularitas}. Tujuannya adalah untuk memisahkan setiap tugas spesifik, seperti logika kuis, pengolahan gambar, kecerdasan buatan (AI), dan manajemen aset multimedia. Dengan struktur ini, proses pengembangan dan \textit{debugging} menjadi lebih mudah. Pembagian folder dan file utamanya adalah sebagai berikut:
+
+\begin{enumerate}
+    \item \textbf{main.py}: Berkas utama yang berfungsi sebagai inti dari aplikasi, menghubungkan ke kamera, logika permainan, dan antarmuka pengguna (\textit{User Interface}).
+    \item \textbf{gesture\_tracking.py}: Modul untuk mendeteksi tangan dan mengenali \textit{gesture} jari (menggambar, \textit{submit}, hapus) menggunakan MediaPipe.
+    \item \textbf{digit\_recognition.py}: Modul AI yang memproses gambar angka dari \textit{canvas} dan melakukan prediksi menggunakan model ONNX MNIST.
+    \item \textbf{quiz\_manager.py}: Mengelola logika kuis, memuat soal dan jawaban, serta menghitung skor.
+    \item \textbf{audio\_manager.py}: Mengelola pemutaran efek suara dan audio soal menggunakan Pygame.
+    \item \textbf{confetti\_effect.py}: Sistem partikel untuk efek visual saat jawaban benar.
+    \item \textbf{models/}: Menyimpan model \textit{Pre-trained} seperti \texttt{mnist-8.onnx}.
+    \item \textbf{assets/}: Berisi aset audio (\texttt{.wav}) dan ikon (\texttt{.png}).
+    \item \textbf{data/}: Berisi gambar soal dan audio soal.
+\end{enumerate}
 
 \subsection{Instalasi Library}
-% Isi cara instalasi library
+Agar program dapat berjalan dengan baik, pustaka yang tercantum dalam file \texttt{requirements.txt} harus diinstal terlebih dahulu. Pustaka utama yang digunakan meliputi \texttt{opencv-python}, \texttt{mediapipe}, \texttt{onnxruntime}, \texttt{pygame}, dan \texttt{numpy}. Instalasi dapat dilakukan dengan perintah berikut di terminal:
 
+\begin{lstlisting}[language=bash, frame=single, basicstyle=\small\ttfamily]
+pip install -r requirements.txt
+\end{lstlisting}
 
 \subsection{Modul main.py}
-\subsubsection{Import library pada main.py}
-% Isi penjelasan import library
+Modul ini adalah file utama yang menghubungkan dan menjalankan semua bagian sistem. Di dalamnya terdapat dua kelas utama yang menangani logika aplikasi dan tampilan visual.
 
-\subsubsection{Memeriksa Dependensi}
-% Isi penjelasan checking dependencies
+\subsubsection{Kelas UIManager}
+Kelas ini bertanggung jawab atas \textbf{menggambar semua tampilan kuis} di atas hasil tangkapan kamera.
+\begin{itemize}
+    \item \texttt{draw\_left\_panel}: Metode ini merender panel informasi di sisi kiri layar yang memuat instruksi permainan, skor terkini, serta indikator status \textit{charging} untuk mode menggambar.
+    \item \texttt{draw\_question\_panel}: Bertugas menampilkan citra soal matematika pada posisi sudut kanan atas layar agar mudah dilihat pengguna tanpa menutupi area kerja utama.
+    \item \texttt{show\_notification} \& \texttt{draw\_notification}: Sepasang metode untuk mengatur dan menampilkan pesan umpan balik sementara (seperti "BENAR!" atau "SALAH!") di bagian tengah bawah layar.
+\end{itemize}
 
-% Lanjutkan dengan penjelasan fungsi-fungsi lain...
+\subsubsection{Kelas MathQuizApp}
+Merupakan kelas inti yang menginisialisasi sistem dan menjalankan \textit{loop} utama aplikasi.
+\begin{itemize}
+    \item \texttt{\_\_init\_\_}: Konstruktor yang menginisialisasi kamera, memuat model AI, serta menyiapkan instansi dari \textit{GestureController}, \textit{QuizManager}, dan \textit{AudioPlayer}.
+    \item \texttt{process\_answer}: Metode logika yang dipanggil saat pengguna melakukan gestur \textit{submit}. Metode ini menghentikan input sementara, melakukan prediksi angka, memvalidasi jawaban dengan kunci jawaban, dan memicu efek audio visual yang sesuai.
+    \item \texttt{run}: Metode utama yang menjalankan siklus pengambilan \textit{frame} kamera, pemrosesan deteksi tangan, pembaruan kanvas, serta pemanggilan fungsi \textit{rendering} UI secara \textit{real-time}.
+\end{itemize}
 
+\subsection{Modul gesture\_tracking.py}
+Modul ini berfungsi untuk \textbf{membaca gerakan tangan kita} dan mengubahnya menjadi perintah digital, semuanya berkat bantuan library MediaPipe.
 
-\subsection{Modul signal\_processing.py}
-% Isi penjelasan modul signal processing
+\subsubsection{Kelas GestureController}
+Kelas ini mengelola logika pelacakan tangan dan penerjemahan posisi jari menjadi aksi pada kanvas.
+\begin{itemize}
+    \item \texttt{get\_hand\_info}: Metode pembungkus (\textit{wrapper}) untuk MediaPipe yang mendeteksi keberadaan tangan dan mengembalikan koordinat 21 titik \textit{landmark} serta status jari (terbuka/tertutup).
+    \item \texttt{process\_gesture}: Inti dari logika interaksi. Metode ini menganalisis konfigurasi jari untuk menentukan mode:
+    \begin{itemize}
+        \item \textbf{1 Jari (Telunjuk)}: Mengaktifkan mode menggambar. Dilengkapi mekanisme \textit{charging} (penundaan) untuk mencegah coretan tidak sengaja.
+        \item \textbf{4 Jari}: Memicu aksi \textit{submit} jawaban.
+        \item \textbf{5 Jari}: Memicu aksi \textit{clear} untuk menghapus kanvas.
+    \end{itemize}
+    \item \texttt{is\_ready\_to\_draw}: Mengembalikan status boolean apakah waktu penundaan (\textit{charging time}) telah terpenuhi sehingga sistem mengizinkan penggambaran garis.
+\end{itemize}
 
+\subsection{Modul digit\_recognition.py}
+Modul ini adalah bagian yang isinya fungsi-fungsi untuk \textbf{mengubah gambar tulisan tangan menjadi angka} yang bisa dibaca oleh program, menggunakan teknologi AI. Modul ini menggunakan pendekatan fungsional, bukan berbasis kelas.
 
-\subsection{Modul gui.py}
-% Isi penjelasan modul GUI
+\subsubsection{Fungsi-fungsi Utama}
+\begin{itemize}
+    \item \texttt{load\_model}: Mengunduh (jika belum ada) dan memuat model \texttt{mnist-8.onnx} menggunakan \texttt{onnxruntime.InferenceSession}.
+    \item \texttt{find\_digit\_bboxes}: Melakukan segmentasi citra untuk menemukan lokasi angka pada kanvas. Metode ini menggunakan teknik kontur (\textit{contours}) OpenCV, menyaring \textit{noise} berdasarkan luas area, dan mengurutkan bounding box dari kiri ke kanan untuk mendukung pembacaan angka multi-digit (puluhan/ratusan).
+    \item \texttt{preprocess\_single\_digit}: Melakukan pra-pemrosesan pada potongan citra angka. Langkah ini meliputi konversi ke \textit{grayscale}, \textit{thresholding}, penyesuaian rasio aspek, dan normalisasi ukuran menjadi $28 \times 28$ piksel agar sesuai dengan input yang diharapkan model MNIST.
+    \item \texttt{recognize\_multi\_digit}: Fungsi orkestrator yang menggabungkan deteksi bounding box dan inferensi model untuk mengenali deretan angka sekaligus, menghasilkan string angka hasil prediksi (misalnya "12").
+\end{itemize}
+
+\subsection{Modul quiz\_manager.py}
+Modul ini mengurus semua \textbf{logika kuis}, seperti menyimpan soal, jawaban, dan mengatur jalannya permainan. Tujuannya agar data soal terpisah dari bagian tampilan.
+
+\subsubsection{Kelas QuizManager}
+\begin{itemize}
+    \item \texttt{\_\_init\_\_} \& \texttt{\_\_load\_questions}: Memindai folder \texttt{data/} untuk memuat pasangan file gambar (\texttt{.png}) dan audio (\texttt{.wav}) secara otomatis, serta membaca kunci jawaban dari \texttt{answers.txt}.
+    \item \texttt{check\_answer}: Membandingkan jawaban hasil prediksi AI dengan kunci jawaban yang tersimpan. Metode ini juga memperbarui statistik skor pemain.
+    \item \texttt{next\_question}: Menggeser pointer indeks ke soal berikutnya dalam antrean.
+    \item \texttt{get\_score}: Mengembalikan statistik performa pemain berupa jumlah jawaban benar, total soal yang telah dijawab, dan persentase keberhasilan.
+\end{itemize}
+
+\subsection{Modul audio\_manager.py}
+Modul ini menangani aspek suara aplikasi, dari narasi soal hingga efek suara, menggunakan pustaka \texttt{pygame.mixer}.
+
+\subsubsection{Kelas AudioPlayer}
+\begin{itemize}
+    \item \texttt{play\_question\_audio}: Memutar rekaman narasi soal. Metode ini bersifat \textit{non-blocking}, sehingga program tetap berjalan lancar saat audio diputar.
+    \item \texttt{play\_sound\_effect}: Memutar efek suara pendek seperti notifikasi salah atau benar.
+    \item \texttt{play\_correct\_sequence}: Menjalankan urutan audio khusus untuk jawaban benar, yaitu memutar suara "correct" diikuti oleh suara tepuk tangan ("applause") secara berurutan.
+\end{itemize}
+
+\subsection{Modul confetti\_effect.py}
+Modul ini mengimplementasikan sistem partikel sederhana untuk memberikan efek visual yang meriah saat pengguna berhasil menjawab dengan benar.
+
+\subsubsection{Kelas Confetti}
+Merepresentasikan satu partikel tunggal. Kelas ini memiliki properti posisi, kecepatan, warna, rotasi, dan bentuk. Metode \texttt{update} di dalamnya menerapkan simulasi fisika sederhana (gravitasi dan resistansi udara) untuk menciptakan efek jatuh yang natural.
+
+\subsubsection{Kelas ConfettiSystem}
+Bertindak sebagai pengelola (\textit{manager}) ribuan objek partikel.
+\begin{itemize}
+    \item \texttt{generate\_burst}: Menciptakan ledakan partikel baru dalam jumlah banyak pada posisi acak di bagian atas layar.
+    \item \texttt{update} \& \texttt{draw}: Memperbarui posisi seluruh partikel aktif dan menggambarnya ke layar pada setiap \textit{frame}.
+\end{itemize}
 
 \newpage

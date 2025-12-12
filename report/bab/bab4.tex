@@ -1,10 +1,110 @@
 \section{Hasil}
 \subsection{Hasil Implementasi}
 
+\subsubsection{Tampilan Awal dan Instruksi}
+Saat program pertama kali dijalankan, pengguna akan disambut dengan layar pembuka (\textit{Intro Screen}). Halaman ini dirancang untuk memberikan pemahaman awal kepada pengguna mengenai cara berinteraksi dengan sistem.
+
+Seperti yang terlihat pada Gambar \ref{fig:intro_screen}, terdapat judul aplikasi yang mencolok dan panduan visual berupa ikon tangan. Panduan ini menjelaskan tiga gestur utama: mengangkat satu jari telunjuk untuk menggambar, empat jari untuk mengirim jawaban (\textit{submit}), dan lima jari untuk menghapus layar. Pengguna diminta menekan tombol spasi untuk memulai permainan.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.8\textwidth]{gambar/intro_screen.png}
+    \caption{Tampilan awal aplikasi menampilkan instruksi penggunaan gesture}
+    \label{fig:intro_screen}
+\end{figure}
+
+\subsubsection{Antarmuka Permainan dan Interaksi Menggambar}
+Setelah masuk ke mode permainan, antarmuka utama dibagi menjadi beberapa area informasi. Pada sisi kiri, terdapat panel vertikal transparan yang menampilkan skor saat ini, nomor soal, dan status indikator kuas (\textit{Brush Status}). Soal matematika ditampilkan dalam kotak khusus di sudut kanan atas layar agar mudah terbaca.
+
+Gambar \ref{fig:drawing_process} memperlihatkan proses saat pengguna menjawab soal. Ketika pengguna mengangkat jari telunjuk, sistem mendeteksi ujung jari tersebut sebagai "pena". Terdapat mekanisme indikator status "CHARGING" yang berubah menjadi "READY" berwarna hijau pada panel kiri. Hal ini menandakan bahwa sistem telah stabil melacak jari dan siap menerima coretan, sehingga garis putih akan muncul mengikuti gerakan jari pengguna di udara (kanvas virtual).
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.8\textwidth]{gambar/drawing_process.png}
+    \caption{Proses menggambar angka pada kanvas virtual menggunakan gesture 1 jari}
+    \label{fig:drawing_process}
+\end{figure}
+
+\subsubsection{Validasi Jawaban dan Umpan Balik}
+Sistem memberikan umpan balik visual dan audio secara langsung setelah pengguna melakukan gesture \textit{submit} (mengangkat 4 jari).
+
+Jika jawaban pengguna sesuai dengan kunci jawaban, sistem menampilkan notifikasi "BENAR!" berwarna hijau di bagian bawah layar, disertai dengan efek visual \textit{confetti} (serpihan kertas warna-warni) yang menyebar untuk memberikan apresiasi, seperti ditunjukkan pada Gambar \ref{fig:correct_answer}.
+
+Sebaliknya, jika prediksi sistem tidak cocok dengan kunci jawaban, notifikasi "SALAH!" berwarna merah akan muncul beserta informasi jawaban yang seharusnya, seperti terlihat pada Gambar \ref{fig:wrong_answer}. Hal ini membantu pengguna mengetahui letak kesalahannya.
+
+\begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{gambar/correct.png}
+        \caption{Feedback Jawaban Benar}
+        \label{fig:correct_answer}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[b]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\textwidth]{gambar/wrong.png}
+        \caption{Feedback Jawaban Salah}
+        \label{fig:wrong_answer}
+    \end{subfigure}
+    \caption{Tampilan validasi jawaban oleh sistem}
+    \label{fig:validation}
+\end{figure}
+
+\subsubsection{Tampilan Skor Akhir}
+Setelah seluruh rangkaian soal selesai dikerjakan, aplikasi menampilkan layar Skor Akhir (\textit{Final Score}). Pada tahap ini, sistem mengalkulasi total jawaban benar dan memberikan peringkat (rating) berdasarkan persentase keberhasilan, mulai dari "KEEP TRYING" hingga "EXCELLENT". Pengguna kemudian diberikan opsi untuk mengulang kuis atau keluar dari aplikasi.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.8\textwidth]{gambar/final_score.png}
+    \caption{Tampilan ringkasan skor setelah kuis selesai}
+    \label{fig:final_score}
+\end{figure}
+
 \subsection{Analisis Hasil}
-% Isi analisis hasil
-% - Performa aplikasi
-% - Akurasi deteksi
-% - dll
+Setelah tahap implementasi antarmuka dan fungsionalitas utama berhasil dilakukan, dilakukan serangkaian pengujian untuk menganalisis kinerja sistem. Analisis difokuskan pada tiga aspek krusial: akurasi pengenalan angka tulisan tangan, responsivitas sistem terhadap \textit{gesture}, dan pengaruh kondisi lingkungan terhadap performa aplikasi.
+
+\subsubsection{Analisis Pengenalan Angka (Digit Recognition)}
+Modul pengenalan angka memegang peranan vital dalam menentukan benar atau salahnya jawaban pengguna. Berdasarkan pengujian, teknik \textit{preprocessing} citra yang diterapkan pada modul \texttt{digit\_recognition.py} terbukti sangat membantu akurasi model ONNX.
+
+Proses \textit{preprocessing} yang meliputi pengubahan citra ke \textit{grayscale}, \textit{thresholding}, hingga \textit{morphological operations (dilatasi dan erosi)} berhasil memisahkan goresan angka dari \textit{noise} latar belakang kanvas. Hal ini membuat input yang masuk ke model menjadi lebih bersih.
+
+Salah satu tantangan utama dalam proyek ini adalah menangani jawaban yang terdiri dari dua digit atau lebih (misalnya angka "12"). Sistem menangani hal ini dengan metode pengurutan kontur (\textit{contour sorting}) dari kiri ke kanan.
+\begin{enumerate}
+    \item Sistem mendeteksi bounding box untuk setiap goresan terpisah.
+    \item Bounding box diurutkan berdasarkan koordinat sumbu X.
+    \item Setiap kotak diprediksi secara terpisah, lalu hasilnya digabungkan menjadi satu string angka.
+\end{enumerate}
+
+Hasilnya, sistem mampu membaca urutan angka secara natural sesuai cara manusia menulis. Namun, ditemukan sedikit kendala akurasi pada bentuk angka yang mirip, seperti angka '4' dan '9', terutama jika pengguna menulis terlalu miring atau proporsinya tidak lazim.
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.8\textwidth]{gambar/digit_analysis.png}
+    \caption{Visualisasi tahapan preprocessing citra sebelum masuk ke model AI}
+    \label{fig:digit_analysis}
+\end{figure}
+
+\subsubsection{Analisis Respon Gesture (Hand Tracking)}
+Pada pengujian interaksi pengguna, tantangan terbesar adalah membedakan antara "gerakan tangan biasa" dan "niat menggambar". Tanpa filter yang tepat, setiap kali tangan pengguna melintas di depan kamera, garis akan tercoret secara tidak sengaja.
+
+Untuk mengatasi hal ini, mekanisme \textit{charging time} (waktu tunggu) yang diterapkan pada kelas \texttt{GestureController} bekerja sangat efektif
+\begin{itemize}
+    \item Saat pengguna mengangkat 1 jari, sistem tidak langsung menggambar.
+    \item Sistem menunggu beberapa \textit{frame} (sekitar 0.5 - 1 detik) hingga indikator berubah menjadi "READY".
+    \item Fitur ini memberikan waktu bagi pengguna untuk memposisikan tangan dengan nyaman sebelum mulai menulis, sehingga hasil tulisan menjadi lebih rapi dan terkontrol.
+\end{itemize}
+
+Selain itu, sistem pengenalan jumlah jari (1, 4, atau 5 jari) menggunakan MediaPipe tergolong sangat responsif. Perpindahan mode dari menggambar (1 jari) ke \textit{submit} (4 jari) dapat dilakukan dengan cepat tanpa jeda yang mengganggu (lag).
+
+\subsubsection{Pengaruh Faktor Lingkungan}
+Karena sistem ini sepenuhnya mengandalkan input visual dari \textit{webcam}, kondisi lingkungan—terutama pencahayaan—memiliki dampak signifikan terhadap performa.
+
+\begin{enumerate}
+    \item \textbf{Pencahayaan:} Pada kondisi ruangan dengan cahaya cukup (terang), deteksi \textit{landmark} tangan sangat stabil dan garis yang digambar terlihat mulus. Namun, pada kondisi minim cahaya (\textit{low light}), kamera cenderung menghasilkan \textit{noise}, yang menyebabkan posisi jari sedikit bergetar (\textit{jitter}). Hal ini membuat garis tulisan menjadi kurang rata.
+    \item \textbf{Latar Belakang:} Sistem bekerja paling optimal pada latar belakang yang polos atau tidak terlalu ramai. Meskipun MediaPipe cukup tangguh (\textit{robust}), latar belakang yang memiliki warna kulit atau objek yang menyerupai tangan terkadang dapat menyebabkan kesalahan deteksi sesaat.
+\end{enumerate}
+
+Secara keseluruhan, sistem mampu berjalan dengan baik pada spesifikasi laptop standar, membuktikan bahwa penggunaan model ONNX yang ringan sangat tepat untuk aplikasi \textit{real-time} seperti ini.
 
 \newpage
