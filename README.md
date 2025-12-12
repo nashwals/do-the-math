@@ -18,6 +18,13 @@ Filter ini akan:
 
 ---
 
+## Video Demo
+
+Video demo project ini dapat diakses melalui link berikut:
+> [Video Demo DO THE MATH!](https://drive.google.com/file/d/1urlYUDikPjhKtki3ZWOaJ9RDNbnePHWT/view?usp=sharing)
+
+---
+
 ## Cara Menjalankan Program
 
 ### 📋 Prerequisites
@@ -191,16 +198,17 @@ do-the-math/
 ├── data/
 │   ├── soal_*.png            # 15 gambar soal
 │   └── audio_soal_*.wav      # 15 audio soal
-└── assets/
-    ├── audio/
-    │   ├── opening.wav       # Intro audio
-    │   ├── correct.wav       # Sound effect benar
-    │   ├── wrong.wav         # Sound effect salah
-    │   └── applause.wav      # Sound effect tepuk tangan
-    └── icons/
-        ├── one.png           # Icon 1 jari
-        ├── four.png          # Icon 4 jari
-        └── five.png          # Icon 5 jari
+├── assets/
+│   ├── audio/
+|   │   ├── opening.wav       # Intro audio
+|   │   ├── correct.wav       # Sound effect benar
+|   │   ├── wrong.wav         # Sound effect salah
+|   │   └── applause.wav      # Sound effect tepuk tangan
+|   └── icons/
+|       ├── one.png           # Icon 1 jari
+|       ├── four.png          # Icon 4 jari
+|       └── five.png          # Icon 5 jari
+└── report/                   # Folder Laporan
 ```
 
 ---
@@ -260,3 +268,9 @@ do-the-math/
 #### 29 - 30 November 2025
 
 - Fiksasi program secara keseluruhan
+
+## Week - 6
+
+#### 08 - 12 Desember 2025
+- Membuat laporan project
+- Membuat video demo
